@@ -183,25 +183,26 @@ def car_common_details(parts, cfg):
 
 def battenburg(cfg):
     """returns {'body': [...], 'l'/'r'/'bl'/'br': [...]} of check squares (UK police livery)"""
-    out = {'body': []}; secs = [(2.02, .80, 'body'), (.80, -.30, ''), (-.36, -.92, 'b'), (-.92, -2.04, 'body')]
+    out = {'body': []}; secs = cfg.get('bsecs', [(2.02, .80, 'body'), (.80, -.30, ''), (-.36, -.92, 'b'), (-.92, -2.04, 'body')])
+    rows = cfg.get('brows', ((.62, .80), (.80, .98))); bx = cfg.get('bx', 1.004)
     k0 = 0
     for f0, f1, key in secs:
         n = max(1, round((f0 - f1) / .4)); L = (f0 - f1) / n
         for i in range(n):
             fc = f0 - L * (i + .5)
-            for row, (z0, z1) in enumerate(((.62, .80), (.80, .98))):
-                if row == 0 and any(abs(fc - wf) < .52 for wf in cfg['wheels_f']): continue
+            for row, (z0, z1) in enumerate(rows):
+                if row == 0 and cfg.get('bskip', True) and any(abs(fc - wf) < .52 for wf in cfg['wheels_f']): continue
                 for side, sgn in (('l', 1), ('r', -1)):
                     m = COMMON['battB'] if (k0 + i + row) % 2 == 0 else COMMON['battY']
-                    b = box('chk', (.025, L - .005, z1 - z0), (sgn * 1.004, -fc, (z0 + z1) / 2), m)
+                    b = box('chk', (.025, L - .005, z1 - z0), (sgn * bx, -fc, (z0 + z1) / 2), m)
                     out.setdefault('body' if key == 'body' else key + side, []).append(b)
         k0 += n
     return out
 
-def police_text(parts):
+def police_text(parts, loc=(0, -1.55, 1.005), size=.26):
     """POLICE on the bonnet, reading for the driver in front looking in the mirror (reversed) is overkill: plain, facing up"""
     try:
-        bpy.ops.object.text_add(location=(0, -1.55, 1.005)); t = bpy.context.object; t.data.body = 'POLICE'; t.data.size = .26; t.data.extrude = .004
+        bpy.ops.object.text_add(location=loc); t = bpy.context.object; t.data.body = 'POLICE'; t.data.size = size; t.data.extrude = .004
         t.data.align_x = 'CENTER'; t.data.align_y = 'CENTER'; t.rotation_euler = (0, 0, math.pi)
         bpy.ops.object.convert(target='MESH'); t.data.materials.clear(); t.data.materials.append(COMMON['battB']); parts.append(t)
     except Exception as e:
@@ -219,7 +220,7 @@ def build_car(cfg, x_off):
     checks = battenburg(cfg) if cfg.get('checks') else {}
     parts += checks.get('body', [])
     b = join(parts, pid + '_body')
-    door_objs = list(cfg['rear_doors']()) if 'rear_doors' in cfg else []
+    door_objs = list(cfg['rear_doors'](pid)) if 'rear_doors' in cfg else []
     smooth(b)
     for (side, hinge_f), d in doors.items():
         sgn = 1 if side.endswith('l') else -1
@@ -326,30 +327,40 @@ VAN_KEYS = [
     (-2.24, .40, .96, .98, 1.14, .92, .88, 2.14, .03)]
 VAN_ZONES = [(1.45, .95, 'ws'), (.95, .25, 'side')]
 
-def van_extra(parts):
+def van_extra(parts, pid='van'):
     for s in (-1, 1):
         parts.append(box('stripe', (.03, 2.3, .16), (s * 1.0, 1.05, 1.32), COMMON['white']))
         parts.append(box('stripe2', (.03, 2.3, .06), (s * 1.0, 1.05, 1.18), COMMON['trim']))
     # frame around the rear opening (the rear cap is left open for the back doors)
-    P = COMMON['paint_van']
+    P = COMMON['paint_' + pid]
     for s in (-1, 1): parts.append(box('rpost', (.1, .08, 1.72), (s * .93, 2.2, 1.28), P))
     parts.append(box('rhead', (1.96, .08, .14), (0, 2.2, 2.08), P))
     parts.append(box('rsill', (1.96, .1, .14), (0, 2.2, .45), P))
 
-def van_rear_doors():
+def van_rear_doors(pid='van'):
     # two back doors hinged on the outer posts (origin = hinge), panel + window + handle
-    out = []; P = COMMON['paint_van']
+    out = []; P = COMMON['paint_' + pid]
     for side, sgn in (('bl', 1), ('br', -1)):
         pan = box('rdp', (.86, .05, 1.52), (sgn * .45, 2.235, 1.29), P, bevel=.015)
         win = box('rdw', (.62, .02, .42), (sgn * .47, 2.262, 1.7), COMMON['glass'])
         hd = box('rdh', (.14, .04, .05), (sgn * .1, 2.27, 1.2), COMMON['trim'])
-        d = join([pan, win, hd], 'van_door_' + side)
+        d = join([pan, win, hd], pid + '_door_' + side)
         bpy.context.scene.cursor.location = (sgn * .9, 2.24, 0)
         bpy.ops.object.select_all(action='DESELECT'); d.select_set(True); bpy.context.view_layer.objects.active = d
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR'); smooth(d)
         out.append(d)
     return out
     parts.append(box('roofrack', (1.5, 2.4, .06), (0, .6, 2.24), COMMON['trim']))
+
+def policevan_extra(parts):
+    van_extra(parts, 'policevan')
+    parts.append(box('barbase', (1.5, .34, .1), (0, -.1, 2.3), COMMON['trim']))
+    parts.append(box('barR', (.68, .3, .14), (.38, -.1, 2.4), COMMON['lightRed'], bevel=.03))
+    parts.append(box('barB', (.68, .3, .14), (-.38, -.1, 2.4), COMMON['lightBlue'], bevel=.03))
+    parts.append(box('grillelight', (.9, .05, .1), (0, -2.26, .72), COMMON['lightBlue']))
+    police_text(parts, loc=(0, -1.78, 1.12), size=.3)
+    parts.append(box('push', (1.6, .12, .5), (0, -2.5, .55), COMMON['trim']))
+    for s in (-1, 1): parts.append(box('pushbar', (.1, .3, .5), (s * .65, -2.38, .55), COMMON['trim']))
 
 CARS = [
     dict(id='saloon', label='Saloon', color=0x7a1c22, keys=SALOON_KEYS, zones=SALOON_ZONES, wheels_f=(1.38, -1.38), arch_z=.8, wheel_r=.38,
@@ -358,6 +369,8 @@ CARS = [
          nose_f=2.26, nose_z=.6, tail_f=-2.26, tail_z=.86, mirror_f=.3, mirror_z=.95, bumper='trim', bump_z=.36, mirror_paint=True, extra=sports_extra, door=(.36, -1.0), inside=dict(seat_f=-.8, seat_z=.38, floor=.3, floor_f=-.75, len=1.9, dash_f=.15, dash_z=.74, wheel_f=-.14, wheel_z=.74)),
     dict(id='van', label='Van', color=0x2c5d8f, keys=VAN_KEYS, zones=VAN_ZONES, wheels_f=(1.4, -1.3), arch_z=.84, wheel_r=.4,
          nose_f=2.24, nose_z=.84, tail_f=-2.24, tail_z=1.0, mirror_f=1.35, mirror_z=1.24, extra=van_extra, door=(.92, .22), open_rear=True, rear_doors=van_rear_doors, tl=((.08, .06, .34), .94), inside=dict(seat_f=.42, seat_z=.74, floor=.46, floor_f=.7, len=1.4, dash_f=1.2, dash_z=1.12, wheel_f=.92, wheel_z=1.12, bulk=(.0, 1.6), cargo=(-.05, -2.16))),
+    dict(id='policevan', label='Police van', color=0xf4f4f4, checks=True, bsecs=[(1.22, .92, 'body'), (.92, .22, ''), (.22, -2.1, 'body')], brows=((.98, 1.18), (1.18, 1.38)), bskip=False, bx=1.0, keys=VAN_KEYS, zones=VAN_ZONES, wheels_f=(1.4, -1.3), arch_z=.84, wheel_r=.4,
+         nose_f=2.24, nose_z=.84, tail_f=-2.24, tail_z=1.0, mirror_f=1.35, mirror_z=1.24, extra=policevan_extra, door=(.92, .22), open_rear=True, rear_doors=van_rear_doors, tl=((.08, .06, .34), .94), inside=dict(seat_f=.42, seat_z=.74, floor=.46, floor_f=.7, len=1.4, dash_f=1.2, dash_z=1.12, wheel_f=.92, wheel_z=1.12, bulk=(.0, 1.6), cargo=(-.05, -2.16))),
     dict(id='police', label='Police car', color=0xf4f4f4, checks=True, keys=SALOON_KEYS, zones=SALOON_ZONES, wheels_f=(1.38, -1.38), arch_z=.8, wheel_r=.38,
          nose_f=2.22, nose_z=.78, tail_f=-2.22, tail_z=.86, mirror_f=.7, mirror_z=1.09, extra=police_extra, door=[(.80, -.30, ''), (-.36, -.92, 'b')], inside=dict(seat_f=-.32, seat_z=.5, floor=.4, floor_f=-.6, len=2.4, dash_f=.62, dash_z=.92, wheel_f=.36, wheel_z=.92, bench=True, bench_off=.72)),
 ]

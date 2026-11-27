@@ -810,25 +810,26 @@ function makeModelCar(type,color){
   body.add(root);
   const all=Object.values(mats),byName=nm=>all.find(m=>m.name===nm);
   const paint=all.find(m=>m.name.startsWith('paint'))||lam(0x888888);
-  const police=type==='police';
+  const police=type==='police'||type==='policevan';
   if(!police)paint.color.setHex(color);
   const paint2=police?(byName('white')||paint):paint;
   const bar=police?[byName('lightRed'),byName('lightBlue')].filter(Boolean):null;
   const doors={};for(const k in (LAYOUTS[type]||SALOON_LAY).doors)doors[k]=root.getObjectByName(type+'_door_'+k);
   return{g,body,paint,paint2,bar:bar&&bar.length===2?bar:null,wheels,mats:all,doors};}
-const CAR_TYPES={saloon:{boost:1,hp:100},sports:{boost:1.15,hp:90},van:{boost:.88,hp:130},police:{boost:1.05,hp:150}};
+const CAR_TYPES={saloon:{boost:1,hp:100},sports:{boost:1.15,hp:90},van:{boost:.88,hp:130},police:{boost:1.05,hp:150},policevan:{boost:.95,hp:190}};
 function pickType(){const r=Math.random();return r<.5?'saloon':r<.72?'sports':'van';}
 
 const cars=[];
 function makeCar(x,z,h,ai,police,type){
-  type=police?'police':(type||pickType());
+  type=police?(type==='policevan'?'policevan':'police'):(type||pickType());
   const m=MODELS[type]?makeModelCar(type,pick(carColors)):makeCarMesh(pick(carColors),police);
   const c={m,pos:new V3(x,0,z),h,vel:new V3(),F:0,L:0,prevF:0,yawR:0,steer:0,steerIn:0,throttle:0,hb:false,ai,police,
-    hp:police?150:100,sirens:police,boost:1,copsOut:false,burnt:false,burnT:0,stuckT:0,revT:0,blockT:0,ignoreT:0,cruise:police?13:rf(9,13),pitch:0,roll:0,spin:0,smokeT:0,hopY:0,hopV:0,direct:false,nav:null};
+    hp:police?150:100,sirens:police,flat:0,boost:1,copsOut:false,burnt:false,burnT:0,stuckT:0,revT:0,blockT:0,ignoreT:0,cruise:police?13:rf(9,13),pitch:0,roll:0,spin:0,smokeT:0,hopY:0,hopV:0,direct:false,nav:null};
   c.type=type;c.boost=CAR_TYPES[type].boost;c.hp=CAR_TYPES[type].hp;c.maxHp=c.hp;
   {const LY=LAYOUTS[type]||SALOON_LAY;c.occ={};for(const k in LY.seats)c.occ[k]=null;c.sq={};c.doorO={};c.doorTgt={};for(const k in LY.doors){c.sq[k]=null;c.doorO[k]=0;c.doorTgt[k]=0;}}c.rageT=0;
   resyncNav(c);cars.push(c);
-  if(ai==='traffic'||ai==='police'){seatNew(c,'d',police);if(police)seatNew(c,'p',true);}
+  if(ai==='traffic'||ai==='police'){seatNew(c,'d',police);if(police)seatNew(c,'p',true);
+    if(type==='policevan'){const n=2+Math.floor(Math.random()*3);for(const k of['b1','b3','b2','b4'].slice(0,n))seatNew(c,k,true);}}
   return c;}
 function removeCar(c){for(const k in c.occ||{}){const q=c.occ[k];if(q&&!isPlayer(q))removePed(q);}for(const sq of seqs.slice())if(sq.car===c)abortSeq(sq);scene.remove(c.m.g);const k=cars.indexOf(c);if(k>=0)cars.splice(k,1);}
 function spawnCarOnRoad(o){
@@ -950,8 +951,8 @@ function respawn(){
   player.human.g.visible=true;player.human.g.rotation.set(0,0,0);player.human.g.position.y=0;setAnim(player.human,'idle',0);hideBig();
   player.armour=0;const lost=Math.min(100,money);addMoney(-100);
   for(const p of peds.slice())if(p.cop)removePed(p);
-  if(heli){scene.remove(heli.g);heli=null;}
-  for(const rb of roadblocks)for(const c of rb.cars)if(cars.includes(c))removeCar(c);roadblocks.length=0;
+  if(heli){scene.remove(heli.g);scene.remove(heli.beam);scene.remove(heli.disc);heli=null;}
+  for(const rb of roadblocks)for(const c of rb.cars)if(cars.includes(c))removeCar(c);for(const rb of roadblocks)if(rb.spike)dropSpike(rb.spike);roadblocks.length=0;
   note(player.deathMsg==='BUSTED'?'Busted. The cops kept <b>$'+lost+'</b>.':'Hospital bill: <b>$'+lost+'</b>.',4);
   if(pendingFail){pendingFail=false;showBig('MISSION FAILED','#c8231e',null,3);}}
 let bigHideAt=0;const bigEl=document.getElementById('big');
@@ -1003,6 +1004,7 @@ const LAYOUTS={saloon:SALOON_LAY,police:SALOON_LAY,
       b1:{x:.39,f:-.62,y:.74,yaw:-Math.PI/2,door:'bl',back:true},b2:{x:.39,f:-1.5,y:.74,yaw:-Math.PI/2,door:'bl',back:true},
       b3:{x:-.39,f:-.62,y:.74,yaw:Math.PI/2,door:'br',back:true},b4:{x:-.39,f:-1.5,y:.74,yaw:Math.PI/2,door:'br',back:true}},
     doors:{r:{x:-1.7,f:.62},l:{x:1.7,f:.62},bl:{x:.48,f:-3.1,out:[0,-1],max:1.9},br:{x:-.48,f:-3.1,out:[0,-1],max:1.9}}}};
+LAYOUTS.policevan=LAYOUTS.van;
 const layOf=c=>LAYOUTS[c.type]||SALOON_LAY;
 const seatKeys=c=>Object.keys(layOf(c).seats);
 const doorOfSeat=(c,k)=>(layOf(c).seats[k]||layOf(c).seats.d).door;
@@ -1014,7 +1016,7 @@ function carL2W(c,lx,ly,lz,out){const fx=Math.sin(c.h),fz=Math.cos(c.h),ax=Math.
 function seatLocal(c,seat){const S=layOf(c).seats[seat]||layOf(c).seats.d,y=S.yaw||0;return{x:S.x-.18*Math.sin(y),y:S.y-.81,z:S.f-.18*Math.cos(y),yaw:y};}
 // walking round a car: next point to head for from (fx,fz) to (tx,tz) without cutting through car c.
 // Shortest path over the four corners of a box a little bigger than the car. Returns {x,z,direct}.
-const CAR_HALF={saloon:[1.12,2.42],police:[1.12,2.5],sports:[1.12,2.42],van:[1.12,2.42]};
+const CAR_HALF={saloon:[1.12,2.42],police:[1.12,2.5],sports:[1.12,2.42],van:[1.12,2.42],policevan:[1.12,2.5]};
 function aroundCar(c,fx,fz,tx,tz){
   const ch=Math.cos(c.h),sh=Math.sin(c.h),toL=(x,z)=>{const dx=x-c.pos.x,dz=z-c.pos.z;return[dx*ch-dz*sh,dx*sh+dz*ch];};
   const HB=CAR_HALF[c.type]||CAR_HALF.saloon,hw=HB[0]+.33,hl=HB[1]+.33,cw=hw+.17,cl=hl+.17;
@@ -1238,7 +1240,7 @@ function aiUpdate(c,dt){
   let tx,tz,desired=c.cruise;
   const direct=chase&&dP<42;
   if(c.direct&&!direct)resyncNav(c);c.direct=direct;
-  if(direct&&!c.copsOut&&dP<18&&Math.abs(c.F)<4&&(!player.car||Math.abs(player.car.F)<5)&&peds.filter(p=>p.state==='cop').length<8){
+  if(direct&&!c.copsOut&&dP<18&&Math.abs(c.F)<4&&(!player.car||Math.abs(player.car.F)<5)&&peds.filter(p=>p.state==='cop').length<14){
     c.copsOut=true;c.ai='parked';c.throttle=0;c.steerIn=0;c.hb=true;
     for(const k in c.occ){const cp=c.occ[k];if(cp&&!isPlayer(cp)&&cp.state==='seated')startSeq('exit',cp,c,doorOfSeat(c,k),{onDone:()=>{cp.state='cop';}});}
     return;}
@@ -1267,7 +1269,7 @@ function carPhysics(c,dt){
   const fx=Math.sin(c.h),fz=Math.cos(c.h),rx=-fz,rz=fx;
   let F=c.vel.x*fx+c.vel.z*fz,L=c.vel.x*rx+c.vel.z*rz;
   const T=c.burnt?0:c.throttle;
-  const B=c.boost||1;
+  const B=(c.boost||1)*(c.flat>0?.55:1);
   if(T>0){if(F<-.5)F+=28*dt*T;else F+=ACC*B*Math.max(0,1-F/(MAXF*B))*T*dt*(F<8?1.3:1);}
   else if(T<0){if(F>.5)F-=30*dt*(-T);else if(F>-13)F+=T*9*dt;}
   else{const r=Math.min(Math.abs(F),(c.burnt?12:3.5)*dt);F-=Math.sign(F)*r;}
@@ -1275,7 +1277,7 @@ function carPhysics(c,dt){
   if(c.hb){const r=Math.min(Math.abs(F),9*dt);F-=Math.sign(F)*r;}
   L*=Math.exp(-(c.hb?1.1:7.5)*dt);
   const sp=Math.abs(F);
-  const yaw=c.steer*2.35*Math.min(1,sp/5)/(1+sp*.022)*Math.sign(F)*(c.hb?1.45:1);
+  const yaw=c.steer*2.35*Math.min(1,sp/5)/(1+sp*.022)*Math.sign(F)*(c.hb?1.45:1)+(c.flat>0?Math.sin(now*13)*.3*Math.min(1,sp/10):0);
   c.h-=yaw*dt;c.yawR=yaw;
   c.vel.x=fx*F+rx*L;c.vel.z=fz*F+rz*L;
   c.pos.x+=c.vel.x*dt;c.pos.z+=c.vel.z*dt;
@@ -1435,6 +1437,8 @@ function updateCop(p,dt){
   move=p.speed;
   p.pos.x+=dx/d*move*dt;p.pos.z+=dz/d*move*dt;resolveCircle(p.pos,.35);
   return move;}
+// officers who share a door (the van's back benches) leave one after another: retry until the car is empty
+function unloadCops(c){for(const k in c.occ){const cp=c.occ[k];if(cp&&!isPlayer(cp)&&cp.cop&&cp.state==='seated'&&!cp.inSeq)startSeq('exit',cp,c,doorOfSeat(c,k),{onDone:()=>{cp.state='cop';}});}}
 function carVisual(c,dt){
   const g=c.m.g;
   if(c.hopV||c.hopY){c.hopY+=c.hopV*dt;c.hopV-=22*dt;if(c.hopY<=0){c.hopY=0;c.hopV=0;}}
@@ -1469,21 +1473,39 @@ function makeHeli(){
   for(const s of[-1,1]){part(.12,.12,3.8,lam(0x222222),s*.95,-1.3,0,g);part(.1,.45,.1,lam(0x222222),s*.95,-1.05,1,g);part(.1,.45,.1,lam(0x222222),s*.95,-1.05,-1,g);}
   const rotor=new THREE.Group();rotor.position.set(0,1.3,0);g.add(rotor);part(11,.08,.34,blk,0,0,0,rotor);part(.34,.08,11,blk,0,0,0,rotor);
   const tail=new THREE.Group();tail.position.set(.32,.95,-6.4);g.add(tail);part(.06,1.9,.22,blk,0,0,0,tail);
-  return{g,rotor,tail,pos:new V3(),vel:new V3(),hp:260,ang:Math.random()*6.3,shootT:3,dead:false,leaving:false,fallV:0,yaw:0};}
+  // searchlight: a soft cone from the belly to a lit disc on the ground
+  const bg=new THREE.CylinderGeometry(7,.25,1,20,1,true);bg.rotateX(Math.PI/2);bg.translate(0,0,.5);
+  const beam=new THREE.Mesh(bg,new THREE.MeshBasicMaterial({color:0xfff3c4,transparent:true,opacity:.13,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  beam.frustumCulled=false;scene.add(beam);
+  const disc=new THREE.Mesh(new THREE.CircleGeometry(7,28).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xfff3c4,transparent:true,opacity:.3,blending:THREE.AdditiveBlending,depthWrite:false}));
+  disc.position.y=.14;scene.add(disc);
+  return{g,rotor,tail,pos:new V3(),vel:new V3(),hp:260,ang:Math.random()*6.3,shootT:3,dead:false,leaving:false,fallV:0,yaw:0,beam,disc,spot:new V3(),litT:0};}
+function heliLight(h,dt){
+  const f=focus(),on=!h.dead&&!h.leaving;h.beam.visible=h.disc.visible=on;if(!on)return;
+  // the spot chases the player with a lag, and wanders while the player is hidden from it
+  const eye=h.pos.clone();eye.y-=1.2;const seen=!player.dead&&hasLOS(eye,playerTarget());
+  const tx=seen?f.x:h.spot.x+Math.cos(now*.8)*4*dt,tz=seen?f.z:h.spot.z+Math.sin(now*.7)*4*dt;
+  h.spot.x+=(tx-h.spot.x)*Math.min(1,dt*(seen?1.4:.4));h.spot.z+=(tz-h.spot.z)*Math.min(1,dt*(seen?1.4:.4));
+  const gy=Math.max(.14,roofAt(h.spot.x,h.spot.z,1)+.14);h.disc.position.set(h.spot.x,gy,h.spot.z);
+  const from=h.pos.clone();from.y-=1.2;h.beam.position.copy(from);h.beam.lookAt(h.spot.x,gy,h.spot.z);h.beam.scale.set(1,1,from.distanceTo(new V3(h.spot.x,gy,h.spot.z)));
+  const lit=seen&&Math.hypot(h.spot.x-f.x,h.spot.z-f.z)<7.5&&!INSIDE;
+  if(lit){lastSeen=now;h.litT+=dt;if(h.litT>.4){h.disc.material.opacity=.42;}}else{h.litT=Math.max(0,h.litT-dt*2);h.disc.material.opacity=.3;}
+  if(h.litT>.4&&!h.noted){h.noted=true;note('The <b>helicopter</b> has you in its searchlight. Get out of the beam or under cover!',4);}
+  if(!lit&&h.litT<=0)h.noted=false;}
 function spawnHeli(){const f=focus();heli=makeHeli();const a=Math.random()*6.3;heli.pos.set(f.x+Math.cos(a)*170,70,f.z+Math.sin(a)*170);note('A police <b>helicopter</b> has joined the chase.',4);}
 function roofAt(x,z,m){let h=0;for(const c of colNear(x-m,x+m,z-m,z+m)){if(c.small)continue;if(colInside(c,x,z,m)&&c.h>h)h=c.h;}return h;}
 function hitHeli(dmg){if(!heli||heli.dead)return;heli.hp-=dmg;if(heli.hp<=0){heli.dead=true;heli.fallV=0;addHeat(2);note('Helicopter down!',3);}}
 function updateHeli(dt){
   if(!heli)return;const h=heli,f=focus();
-  h.rotor.rotation.y+=dt*(h.dead?12:30);h.tail.rotation.x+=dt*40;
+  h.rotor.rotation.y+=dt*(h.dead?12:30);h.tail.rotation.x+=dt*40;heliLight(h,dt);
   if(h.dead){h.fallV-=11*dt;h.pos.y+=h.fallV*dt;h.pos.x+=h.vel.x*dt;h.pos.z+=h.vel.z*dt;h.g.rotation.y+=dt*4.5;
     if(Math.random()<.6)puff(h.pos.x,h.pos.y,h.pos.z,rf(-.5,.5),1,rf(-.5,.5),1.6,0x2a2724,.6,1.4,-.2,.7);
     h.g.position.copy(h.pos);
-    if(h.pos.y<=roofAt(h.pos.x,h.pos.z,1)+1){explodeAt(h.pos.x,Math.max(1,h.pos.y),h.pos.z,true,null);scene.remove(h.g);heli=null;heliT=40;}
+    if(h.pos.y<=roofAt(h.pos.x,h.pos.z,1)+1){explodeAt(h.pos.x,Math.max(1,h.pos.y),h.pos.z,true,null);scene.remove(h.g);scene.remove(h.beam);scene.remove(h.disc);heli=null;heliT=40;}
     return;}
   let des;
   if(h.leaving){des=new V3(h.pos.x-f.x,0,h.pos.z-f.z).setLength(25);des.y=6;
-    if(d2(h.pos.x,h.pos.z,f.x,f.z)>260*260){scene.remove(h.g);heli=null;return;}}
+    if(d2(h.pos.x,h.pos.z,f.x,f.z)>260*260){scene.remove(h.g);scene.remove(h.beam);scene.remove(h.disc);heli=null;return;}}
   else{h.ang+=dt*.25;const tx=f.x+Math.cos(h.ang)*22,tz=f.z+Math.sin(h.ang)*22;
     const ty=Math.max(26,roofAt(tx,tz,8)+10,roofAt(h.pos.x,h.pos.z,8)+10);
     des=new V3(tx-h.pos.x,(ty-h.pos.y)*1.5,tz-h.pos.z).multiplyScalar(.8);if(des.length()>28)des.setLength(28);}
@@ -1507,9 +1529,30 @@ function spawnRoadblock(){
   const rb={cars:[],t:0};
   for(const o of[-E.w*.3,0,E.w*.3]){const x=bx+px*o,z=bz+pz*o;for(const q of cars.slice())if(q!==player.car&&q.ai==='traffic'&&d2(q.pos.x,q.pos.z,x,z)<36)removeCar(q);
     if(cars.some(q=>d2(q.pos.x,q.pos.z,x,z)<9))continue;
-    const car=makeCar(x,z,Math.atan2(px,pz)+(o===0?.25:-.2),'parked',true);car.sirens=true;rb.cars.push(car);}
+    const car=makeCar(x,z,Math.atan2(px,pz)+(o===0?.25:-.2),'parked',true,o===0&&stars()>=3?'policevan':undefined);car.sirens=true;rb.cars.push(car);}
+  rb.spike=makeSpike(bx-fx*13-px*E.w*.2,bz-fz*13-pz*E.w*.2,px,pz,E.w*.6);
   for(const sg of[-1,1])spawnPed({x:bx+fx*3.5+px*sg*3,z:bz+fz*3.5+pz*sg*3,cop:true});
   roadblocks.push(rb);return true;}
+
+// ---------------- spike strips ----------------
+const spikes=[];let spikeTex=null;
+function makeSpike(x,z,ax,az,w){
+  if(!spikeTex){const cv=document.createElement('canvas');cv.width=256;cv.height=24;const g=cv.getContext('2d');g.fillStyle='#16171a';g.fillRect(0,0,256,24);g.fillStyle='#c9ced4';
+    for(let i=0;i<24;i++){const x0=i*10.6+1;g.beginPath();g.moveTo(x0,23);g.lineTo(x0+4.3,2);g.lineTo(x0+8.6,23);g.fill();}
+    spikeTex=new THREE.CanvasTexture(cv);spikeTex.wrapS=THREE.RepeatWrapping;}
+  const t=spikeTex.clone();t.needsUpdate=true;t.repeat.set(Math.max(1,w/3.6),1);
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,.55),new THREE.MeshBasicMaterial({map:t}));
+  m.rotation.set(-Math.PI/2,Math.atan2(-az,ax),0,'YXZ');m.position.set(x,.1,z);scene.add(m);
+  const sp={x,z,ax,az,w,m,hit:false};spikes.push(sp);return sp;}
+function dropSpike(sp){scene.remove(sp.m);const i=spikes.indexOf(sp);if(i>=0)spikes.splice(i,1);}
+function updateSpikes(dt){
+  const c=player.car;
+  for(const sp of spikes){if(!c||sp.hit)continue;const rx=c.pos.x-sp.x,rz=c.pos.z-sp.z,u=rx*sp.ax+rz*sp.az;
+    const along=rx*(-sp.az)+rz*sp.ax;
+    if(Math.abs(u)<sp.w/2+.6&&Math.abs(along)<1.4&&Math.abs(c.F)>1.5){sp.hit=true;c.flat=30;
+      noise(.35,3000,.5);thump(220,.2,.5);for(let k=0;k<10;k++)puff(c.pos.x+rf(-1,1),.2,c.pos.z+rf(-1,1),rf(-2,2),rf(1,3),rf(-2,2),.25,0x8b8f96,.3,.1,8,1);
+      shake=Math.max(shake,.5);note('<b style="color:#ff6a5a">Spike strip!</b> Your tyres are shredded. Swap cars or visit the Spray Shop.',5);}}
+  if(c&&c.flat>0){c.flat-=dt;if(Math.abs(c.F)>3&&Math.random()<dt*9)sparks(new V3(c.pos.x+rf(-1,1),.25,c.pos.z+rf(-1.5,1.5)),0xffd27a);}}
 
 // ---------------- pickups ----------------
 const pickups=[];
@@ -1558,7 +1601,7 @@ function updateSpray(dt){
   sprayUsed=true;sprayOpen=false;
   addMoney(-100);const had=stars()>0;heat=0;
   c.hp=c.maxHp||100;c.vel.set(0,0,0);
-  const col=SPRAY_COLS[pickIdx][0];c.m.paint.color.setHex(col);if(c.m.paint2!==c.m.paint)c.m.paint2.color.setHex(col);c.police=false;c.sirens=false;
+  const col=SPRAY_COLS[pickIdx][0];c.m.paint.color.setHex(col);if(c.m.paint2!==c.m.paint)c.m.paint2.color.setHex(col);c.police=false;c.sirens=false;c.flat=0;
   for(let k=0;k<30;k++)puff(c.pos.x+rf(-2,2),rf(.5,2),c.pos.z+rf(-3,3),rf(-1,1),rf(0,1),rf(-1,1),1.2,col,.3,.8,0,.6);
   ding(660,990);note(had?'Respray done. <b>Wanted level cleared!</b> (−$100)':'Respray done. Car repaired. (−$100)',4);}
 
@@ -1725,15 +1768,16 @@ function manage(dt){
   // police
   const want=[0,2,3,4,5,6][st];const act=cars.filter(c=>c.ai==='police'&&!c.burnt).length+Math.ceil(peds.filter(p=>p.state==='cop').length/2);
   // helicopter + roadblocks
-  if(st>=4&&!player.dead){if(!heli){heliT-=dt;if(heliT<=0)spawnHeli();}
-    if(player.car){roadblockT-=dt;if(roadblockT<=0){roadblockT=22;if(roadblocks.length<2)spawnRoadblock();}}}
-  else{if(heli&&!heli.dead)heli.leaving=true;if(!heli)heliT=8;roadblockT=6;}
+  if(st>=3&&!player.dead&&player.car){roadblockT-=dt;if(roadblockT<=0){roadblockT=20;if(roadblocks.length<2)spawnRoadblock();}}else roadblockT=Math.min(roadblockT,8);
+  if(st>=4&&!player.dead){if(!heli){heliT-=dt;if(heliT<=0)spawnHeli();}}
+  else{if(heli&&!heli.dead)heli.leaving=true;if(!heli)heliT=8;}
+  updateSpikes(dt);
   for(const rb of roadblocks.slice()){rb.t+=dt;const far=rb.cars.every(c=>c===player.car||!cars.includes(c)||d2(c.pos.x,c.pos.z,f.x,f.z)>140*140);
-    if(rb.t>12&&far){for(const c of rb.cars)if(c!==player.car&&cars.includes(c))removeCar(c);roadblocks.splice(roadblocks.indexOf(rb),1);}}
+    if(rb.t>12&&far){for(const c of rb.cars)if(c!==player.car&&cars.includes(c))removeCar(c);if(rb.spike)dropSpike(rb.spike);roadblocks.splice(roadblocks.indexOf(rb),1);}}
   for(const c of cars.slice())if(c.police&&c.ai==='parked'&&c!==player.car&&!roadblocks.some(rb=>rb.cars.includes(c))&&d2(c.pos.x,c.pos.z,f.x,f.z)>150*150)removeCar(c);
   // stray officers on foot are tidied away; officers sitting in a patrol car go when their car does
   for(const p of peds.slice())if(p.cop&&p.state!=='seated'&&!p.inSeq&&d2(p.pos.x,p.pos.z,f.x,f.z)>(p.state==='cop'?110*110:60*60))removePed(p);
-  if(act<want&&!player.dead){policeSpawnT-=dt;if(policeSpawnT<=0){policeSpawnT=2.2;spawnCarOnRoad({police:true,min:80,max:170});}}
+  if(act<want&&!player.dead){policeSpawnT-=dt;if(policeSpawnT<=0){policeSpawnT=2.2;spawnCarOnRoad({police:true,min:80,max:170,type:(st>=3&&!cars.some(c=>c.type==='policevan'&&!c.burnt)&&Math.random()<.5)?'policevan':undefined});}}
   if(st===0)for(const c of cars.slice())if(c.ai==='police'&&d2(c.pos.x,c.pos.z,f.x,f.z)>130*130)removeCar(c);
   // traffic
   trafficT-=dt;if(trafficT<=0){trafficT=1;const tr=cars.filter(c=>c.ai==='traffic');if(tr.length<TRAFFIC)spawnCarOnRoad({min:70,max:200});
@@ -1771,6 +1815,7 @@ function update(dt){
   updateSeqs(dt);
   for(const c of cars){
     const dr=c.occ.d,busy=carBusy(c);
+    if(c.copsOut&&c.police&&c!==player.car)unloadCops(c);
     if(c===player.car&&!busy)playerDrive(c);
     else if(!busy&&(c.ai==='traffic'||c.ai==='police')&&dr&&!isPlayer(dr)&&dr.state==='seated')aiUpdate(c,dt);
     else{c.throttle=0;c.steerIn=0;c.hb=busy;}
