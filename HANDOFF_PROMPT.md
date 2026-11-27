@@ -141,3 +141,7 @@ After every change that works, commit and push to `main` on `ChadALowe/blockrunn
 
 ## Lock-up (update)
 The garage is a physical lock-up on the free ground right beside the flat tower (`LOCKLOT`, computed from `HOMELOT`'s neighbour gap; width 6-12.5 m). Green roller door opens as you approach, closes when you leave or get wanted. Cars inside are auto-saved to `HOMEDATA.garage` (`c.keep=true`), restored by `restoreLockup()`. The old key hook/menu is gone. The flat door is offset toward the garage (`HOMEDOFF`). Tests: `br/test/lock.js`, `layout.js`.
+
+## Map viewer and car health
+- Full-screen map: press M, or tap the minimap. State `'map'` (`openMap/closeMap/mapKey/mapFrame`), pan (drag/WASD), zoom (wheel, pinch, +/-), legend, and a waypoint (click/tap, Enter at crosshair, SET WAYPOINT/CLEAR buttons). Waypoint `WP` shows on the minimap, as an orange beam in the world, and clears within 11 m. Test: `br/test/map.js`.
+- Car health more than doubled: `CAR_TYPES` hp saloon 230, sports 200, van 290, police 330, police van 420. Older saved garage cars keep their stored hp.

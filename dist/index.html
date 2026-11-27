@@ -78,6 +78,16 @@ canvas#gl{display:block;width:100vw;height:100vh;height:100dvh}
 #bye .msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.55);font:400 clamp(36px,10vh,80px) 'Pirata One',serif;text-shadow:3px 3px 0 #000;text-align:center}
 #bye .msg small{font:600 clamp(13px,2.6vh,17px) system-ui,sans-serif;letter-spacing:2px;margin-top:1em}
 #shop{background:transparent;touch-action:none}
+#mini{pointer-events:auto;cursor:pointer}
+#bmap{background:#27384a;touch-action:none;user-select:none}
+#bmc{position:absolute;inset:0;width:100%;height:100%;display:block}
+#bmtop{position:absolute;left:0;right:0;top:0;display:flex;gap:8px;align-items:center;padding:calc(8px + var(--st)) calc(12px + var(--sr)) 8px calc(12px + var(--sl));background:linear-gradient(#000a,#0000);pointer-events:none}
+#bmtop b{font:900 20px system-ui,sans-serif;letter-spacing:2px;margin-right:auto;text-shadow:1px 1px 0 #000}
+.bmb{pointer-events:auto;font:800 13px system-ui,sans-serif;background:rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.6);border-radius:8px;padding:9px 13px;cursor:pointer;color:#fff}
+.bmb:active{background:rgba(255,255,255,.25)}
+#bmleg{position:absolute;left:calc(12px + var(--sl));bottom:calc(10px + var(--sb));background:rgba(0,0,0,.6);border-radius:8px;padding:7px 10px;font:600 11px system-ui,sans-serif;line-height:1.7;pointer-events:none}
+#bmleg i{display:inline-block;width:14px;height:14px;border-radius:50%;border:1.5px solid #000;color:#000;font:900 9px/12px system-ui;text-align:center;font-style:normal;margin-right:5px;vertical-align:-2px}
+#bmhint{position:absolute;right:calc(12px + var(--sr));bottom:calc(10px + var(--sb));font:600 11px system-ui,sans-serif;background:rgba(0,0,0,.6);border-radius:8px;padding:7px 10px;pointer-events:none;text-align:right}
 #shop .panel{position:absolute;right:calc(3% + var(--sr));top:50%;transform:translateY(-50%);width:min(46%,480px);max-height:94%;overflow-y:auto;background:rgba(10,10,16,.8);border-radius:10px;padding:14px 18px;box-shadow:0 6px 30px rgba(0,0,0,.5);scrollbar-width:none}
 #shop .stitle{font:400 clamp(24px,6vh,40px) 'Pirata One',serif;color:#ffd23f;text-shadow:2px 2px 0 #000}
 #shop .scash{font:700 clamp(13px,2.8vh,17px) system-ui,sans-serif;color:#4fb25a;margin-bottom:6px}
@@ -194,6 +204,7 @@ body.touchui #cross{width:22px;height:22px;margin:-11px 0 0 -11px}
   <div id="mpanel"><div id="mtitle"></div><div id="minfo"></div><div id="mitems"></div></div>
   <div id="mhint"></div>
 </div>
+<div id="bmap" class="screen"><canvas id="bmc"></canvas><div id="bmtop"><b>MAP</b><div class="bmb" id="bmWp">SET WAYPOINT</div><div class="bmb" id="bmClr">CLEAR</div><div class="bmb" id="bmHome">ME</div><div class="bmb" id="bmX">✕</div></div><div id="bmleg"></div><div id="bmhint"></div></div>
 <div id="shop" class="screen"><div class="panel"></div><div class="shint"></div></div>
 <div id="bye" class="screen">
   <div class="arts"><div class="art a1"></div><div class="art a2"></div><div class="art a3"></div><div class="art a4"></div></div>
@@ -1026,7 +1037,7 @@ function makeModelCar(type,color){
   const bar=police?[byName('lightRed'),byName('lightBlue')].filter(Boolean):null;
   const doors={};for(const k in (LAYOUTS[type]||SALOON_LAY).doors)doors[k]=root.getObjectByName(type+'_door_'+k);
   return{g,body,paint,paint2,bar:bar&&bar.length===2?bar:null,wheels,mats:all,doors};}
-const CAR_TYPES={saloon:{boost:1,hp:100},sports:{boost:1.15,hp:90},van:{boost:.88,hp:130},police:{boost:1.05,hp:150},policevan:{boost:.95,hp:190}};
+const CAR_TYPES={saloon:{boost:1,hp:230},sports:{boost:1.15,hp:200},van:{boost:.88,hp:290},police:{boost:1.05,hp:330},policevan:{boost:.95,hp:420}};
 function pickType(){const r=Math.random();return r<.5?'saloon':r<.72?'sports':'van';}
 
 const cars=[];
@@ -1936,7 +1947,9 @@ function drawMini(){
   if(ATTACK){const b=blocks[ATTACK.bi];miniIcon(b.cx,b.cz,'#ff3030','!',7,84);}
   if(heli&&!heli.dead){const p=miniXY(heli.pos.x,heli.pos.z,84);mctx.fillStyle=Math.floor(now*5)%2?'#9fc0ff':'#3070ff';mctx.fillRect(p[0]-4,p[1]-4,8,8);}
   if(mission&&mission.blip){const b=mission.blip;miniIcon(b.x,b.z,b.col,null,6,84);}
+  if(WP)miniIcon(WP.x,WP.z,'#ff9a1a','\u25bc',7,84);
 }
+miniEl.addEventListener('pointerdown',e=>{if(state==='game'){e.preventDefault();e.stopPropagation();openMap();}});
 function updateHUD(){
   const st=stars();const flashOn=st>0&&now-lastSeen<2&&Math.floor(now*4)%2===0;
   let html='';for(let k=1;k<=5;k++)html+=k<=st?(flashOn?'<span class="off">★</span>':'★'):'<span class="off">★</span>';
@@ -2219,6 +2232,7 @@ mItems.addEventListener('mousemove',e=>{if(touchUI)return;const row=e.target.clo
 function menuKey(e){
   if(state==='shop'){shopKey(e);return;}
   if(state==='list'){listKey(e);return;}
+  if(state==='map'){mapKey(e);return;}
   if(state==='gunshop'){gunKey(e);return;}
   if(state==='boot'){if(e.code==='Enter'||e.code==='Space')bootContinue();return;}
   if(state==='bye'){show(byeEl,false);openMenu('main');startMusic();return;}
@@ -2243,7 +2257,7 @@ function openPause(){if(state!=='game')return;for(const k in keys)keys[k]=false;
 function toMainMenu(){if(mission)cleanupMission();openMenu('main');startMusic();}
 function quitGame(){stopMusic();show(menuEl,false);show(byeEl,true);state='bye';exitFullscreen();}
 document.addEventListener('pointerlockchange',()=>{if(locked())wasLocked=true;else if(wasLocked){wasLocked=false;if(state==='game')openPause();}});
-addEventListener('keydown',e=>{if(state!=='game'){menuKey(e);return;}if(e.code==='Escape'||e.code==='KeyP')openPause();},true);
+addEventListener('keydown',e=>{if(state!=='game'){menuKey(e);return;}if(e.code==='Escape'||e.code==='KeyP')openPause();else if(e.code==='KeyM'&&!e.repeat)openMap();},true);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)openPause();});
 noteEl.addEventListener('pointerdown',e=>{const t=e.target.closest('[data-sp]');if(t&&sprayOpen){e.stopPropagation();sprayPick=+t.dataset.sp;}});
 
@@ -2828,7 +2842,7 @@ function insideUpdate(dt){
   if(noteT>0){noteT-=dt;if(noteT<=0)noteEl.style.display='none';}
   updateParts(dt);updateCamera(dt);
   sun.position.set(player.pos.x+SUNOFF.x,SUNOFF.y,player.pos.z+SUNOFF.z);sun.target.position.set(player.pos.x,0,player.pos.z);
-  updateHUD();updateAudio();}
+  updateWaypoint();updateHUD();updateAudio();}
 // ======================================================================
 // SAFEHOUSE: Flat 14, Grove Court. A bed (save / sleep), a wardrobe (saved outfits) and the keys to your lock-up (stored cars).
 // ======================================================================
@@ -2940,6 +2954,78 @@ function homeUpdate(dt){
   updateParts(dt);updateCamera(dt);
   sun.position.set(player.pos.x+SUNOFF.x,SUNOFF.y,player.pos.z+SUNOFF.z);sun.target.position.set(player.pos.x,0,player.pos.z);
   updateHUD();updateAudio();}
+
+// ---- full-screen map (M or tap the minimap): pan, zoom, legend, waypoint
+let WP=null,wpBeam=null;
+function setWaypoint(x,z){WP=x==null?null:{x,z};
+  if(!wpBeam){wpBeam=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,90,10,1,true),new THREE.MeshBasicMaterial({color:0xff9a1a,transparent:true,opacity:.35,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));wpBeam.frustumCulled=false;scene.add(wpBeam);}
+  wpBeam.visible=!!WP;if(WP)wpBeam.position.set(WP.x,45,WP.z);}
+function updateWaypoint(){if(!WP)return;const f=focus();if(d2(f.x,f.z,WP.x,WP.z)<11*11){setWaypoint(null);note('You have reached your waypoint',2.5);return;}
+  wpBeam.material.opacity=.25+.15*Math.sin(now*4);}
+const bmEl=document.getElementById('bmap'),bmc=document.getElementById('bmc'),bmx=bmc.getContext('2d');
+const BM={x:0,z:0,s:1,W:0,H:0,sMin:.1,sMax:5,ptrs:new Map(),moved:0,pd:0};
+function bmLegend(){const it=[['#4fd2ff','\u2302','Home'],['#ffb04a','L','Lock-up'],['#ff7fc0','S','Spray shop'],['#6aa8ff','B','Barber'],['#4fd07a','C','Clothes'],['#ff5a4a','G','Gun shop'],['#ffd23f','!','Mission'],['#ff9a1a','\u25bc','Waypoint']];
+  document.getElementById('bmleg').innerHTML=it.map(a=>'<div><i style="background:'+a[0]+'">'+a[1]+'</i>'+a[2]+'</div>').join('');
+  document.getElementById('bmhint').innerHTML=touchUI?'Drag to move · pinch to zoom<br>Tap the map to set a waypoint':'Drag or WASD to move · wheel or +/- to zoom<br>Click to set a waypoint · Enter = at crosshair · M/Esc close';}
+const bmDpr=()=>Math.min(2,devicePixelRatio||1);
+function bmFit(){const r=bmEl.getBoundingClientRect();BM.W=bmc.width=Math.max(2,Math.round(r.width*bmDpr()));BM.H=bmc.height=Math.max(2,Math.round(r.height*bmDpr()));
+  BM.sMin=Math.min(BM.W,BM.H)/WSIZE;BM.sMax=Math.min(BM.W,BM.H)/110;BM.s=clamp(BM.s,BM.sMin,BM.sMax);}
+function openMap(){if(state!=='game'||player.dead||player.inSeq)return;
+  for(const k in keys)keys[k]=false;mouse.left=mouse.right=false;T.fire=T.jump=T.horn=false;T.jx=T.jy=T.mag=0;
+  try{document.exitPointerLock&&document.exitPointerLock();}catch(e){}
+  state='map';started=false;hudEl.style.display='none';document.body.classList.remove('ingame');if(master)master.gain.value=0;
+  show(bmEl,true);bmLegend();const f=focus();BM.x=f.x;BM.z=f.z;BM.s=1;bmFit();BM.s=clamp(BM.sMin*2.2,BM.sMin,BM.sMax);BM.ptrs.clear();blip(700);}
+function closeMap(){if(state!=='map')return;show(bmEl,false);state='game';enterGame();blip(520);}
+const bmWorld=(px,py)=>[BM.x+(px-BM.W/2)/BM.s,BM.z+(py-BM.H/2)/BM.s];
+function bmPos(e){const r=bmc.getBoundingClientRect();return[(e.clientX-r.left)*BM.W/r.width,(e.clientY-r.top)*BM.H/r.height];}
+function bmWaypointAt(x,z){if(WP&&d2(WP.x,WP.z,x,z)<(14/BM.s)**2){setWaypoint(null);blip(400);return;}setWaypoint(x,z);blip(900);}
+bmc.addEventListener('pointerdown',e=>{e.preventDefault();initAudio();try{bmc.setPointerCapture(e.pointerId);}catch(_){}const p=bmPos(e);BM.ptrs.set(e.pointerId,{x:p[0],y:p[1]});BM.moved=0;if(BM.ptrs.size===2){const a=[...BM.ptrs.values()];BM.pd=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);}});
+bmc.addEventListener('pointermove',e=>{const q=BM.ptrs.get(e.pointerId);if(!q)return;const p=bmPos(e);
+  if(BM.ptrs.size===1){BM.x-=(p[0]-q.x)/BM.s;BM.z-=(p[1]-q.y)/BM.s;BM.moved+=Math.abs(p[0]-q.x)+Math.abs(p[1]-q.y);}
+  q.x=p[0];q.y=p[1];
+  if(BM.ptrs.size===2){const a=[...BM.ptrs.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);if(BM.pd>0)BM.s=clamp(BM.s*d/BM.pd,BM.sMin,BM.sMax);BM.pd=d;BM.moved+=20;}});
+const bmUp=e=>{const q=BM.ptrs.get(e.pointerId);if(!q)return;const was=BM.ptrs.size;BM.ptrs.delete(e.pointerId);
+  if(e.type==='pointerup'&&was===1&&BM.moved<10*bmDpr()){const w=bmWorld(q.x,q.y);bmWaypointAt(w[0],w[1]);}};
+bmc.addEventListener('pointerup',bmUp);bmc.addEventListener('pointercancel',bmUp);
+bmc.addEventListener('wheel',e=>{e.preventDefault();const p=bmPos(e),w0=bmWorld(p[0],p[1]);BM.s=clamp(BM.s*(e.deltaY<0?1.18:1/1.18),BM.sMin,BM.sMax);const w1=bmWorld(p[0],p[1]);BM.x+=w0[0]-w1[0];BM.z+=w0[1]-w1[1];},{passive:false});
+document.getElementById('bmX').addEventListener('pointerdown',e=>{e.preventDefault();closeMap();});
+document.getElementById('bmWp').addEventListener('pointerdown',e=>{e.preventDefault();bmWaypointAt(BM.x,BM.z);});
+document.getElementById('bmClr').addEventListener('pointerdown',e=>{e.preventDefault();setWaypoint(null);blip(400);});
+document.getElementById('bmHome').addEventListener('pointerdown',e=>{e.preventDefault();const f=focus();BM.x=f.x;BM.z=f.z;blip(600);});
+function mapKey(e){const c=e.code,st=40/BM.s;
+  if(c==='Escape'||c==='KeyM'||c==='Backspace')closeMap();
+  else if(c==='ArrowLeft'||c==='KeyA')BM.x-=st;else if(c==='ArrowRight'||c==='KeyD')BM.x+=st;
+  else if(c==='ArrowUp'||c==='KeyW')BM.z-=st;else if(c==='ArrowDown'||c==='KeyS')BM.z+=st;
+  else if(c==='Equal'||c==='NumpadAdd'||c==='KeyE')BM.s=clamp(BM.s*1.25,BM.sMin,BM.sMax);
+  else if(c==='Minus'||c==='NumpadSubtract'||c==='KeyQ')BM.s=clamp(BM.s/1.25,BM.sMin,BM.sMax);
+  else if(c==='Enter'||c==='Space')bmWaypointAt(BM.x,BM.z);
+  else if(c==='KeyC')setWaypoint(null);
+  e.preventDefault();}
+function mapFrame(dt){
+  {const r=bmEl.getBoundingClientRect();if(Math.abs(r.width*bmDpr()-BM.W)>2||Math.abs(r.height*bmDpr()-BM.H)>2)bmFit();}
+  const W=BM.W,H=BM.H,s=BM.s,x=bmx;
+  BM.x=clamp(BM.x,WMIN,WMIN+WSIZE);BM.z=clamp(BM.z,WMIN,WMIN+WSIZE);
+  x.setTransform(1,0,0,1,0,0);x.fillStyle='#4a6a86';x.fillRect(0,0,W,H);
+  x.save();x.translate(W/2,H/2);x.scale(s,s);x.translate(-BM.x,-BM.z);x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
+  x.drawImage(mapC,WMIN,WMIN,WSIZE,WSIZE);
+  blocks.forEach((b,k)=>{const g=TURF[k];if(g<0)return;x.fillStyle=GANG[g].rgba;x.beginPath();b.kerb.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.fill();});
+  x.restore();
+  const S=(wx,wz)=>[W/2+(wx-BM.x)*s,H/2+(wz-BM.z)*s],u=Math.max(1,Math.min(W,H)/520);
+  const icon=(wx,wz,fill,ch,r)=>{const p=S(wx,wz);if(p[0]<-20||p[1]<-20||p[0]>W+20||p[1]>H+20)return;r*=u;x.fillStyle=fill;x.strokeStyle='#000';x.lineWidth=2*u;x.beginPath();x.arc(p[0],p[1],r,0,7);x.fill();x.stroke();
+    if(ch){x.fillStyle='#000';x.font='900 '+Math.round(r*1.1)+'px system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(ch,p[0],p[1]+u*.5);}};
+  if(LOCK)icon(LOCK.g.x,LOCK.g.z,'#ffb04a','L',11);
+  if(SPRAY)icon(SPRAY.x,SPRAY.z,'#ff7fc0','S',11);
+  for(const Sh of SHOPS)icon(Sh.x,Sh.z,{barber:'#6aa8ff',clothes:'#4fd07a',guns:'#ff5a4a',home:'#4fd2ff'}[Sh.type],{barber:'B',clothes:'C',guns:'G',home:'\u2302'}[Sh.type],11);
+  if(!mission)for(const d of MDEFS)icon(d.x,d.z,'#ffd23f',d.letter,11);
+  if(ATTACK){const b=blocks[ATTACK.bi];icon(b.cx,b.cz,'#ff3030','!',11);}
+  if(mission&&mission.blip){const b=mission.blip;icon(b.x,b.z,b.col,null,9);}
+  if(WP)icon(WP.x,WP.z,'#ff9a1a','\u25bc',12);
+  {const f=focus(),p=S(f.x,f.z),fa=player.car?player.car.h:player.facing,ax=Math.sin(fa),az=Math.cos(fa),bx=-az,bz=ax,k=11*u;
+    x.fillStyle='#fff';x.strokeStyle='#000';x.lineWidth=2*u;x.beginPath();x.moveTo(p[0]+ax*k*1.5,p[1]+az*k*1.5);x.lineTo(p[0]-ax*k+bx*k,p[1]-az*k+bz*k);x.lineTo(p[0]-ax*k*.4,p[1]-az*k*.4);x.lineTo(p[0]-ax*k-bx*k,p[1]-az*k-bz*k);x.closePath();x.fill();x.stroke();}
+  x.strokeStyle='rgba(255,255,255,.85)';x.lineWidth=2*u;x.beginPath();x.moveTo(W/2-12*u,H/2);x.lineTo(W/2-4*u,H/2);x.moveTo(W/2+4*u,H/2);x.lineTo(W/2+12*u,H/2);x.moveTo(W/2,H/2-12*u);x.lineTo(W/2,H/2-4*u);x.moveTo(W/2,H/2+4*u);x.lineTo(W/2,H/2+12*u);x.stroke();
+  x.fillStyle='#fff';x.strokeStyle='#000';x.lineWidth=3*u;x.font='900 '+Math.round(18*u)+'px system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';x.strokeText('N',W-30*u,H-80*u);x.fillText('N',W-30*u,H-80*u);
+  if(WP){const f=focus(),dd=Math.round(Math.hypot(WP.x-f.x,WP.z-f.z));x.font='800 '+Math.round(14*u)+'px system-ui,sans-serif';x.textAlign='left';const t='Waypoint '+dd+' m';x.strokeText(t,14*u,H-130*u);x.fillStyle='#ffb040';x.fillText(t,14*u,H-130*u);}
+}
 
 // ---- a small list menu (uses the shop panel)
 let LM=null;
@@ -3539,6 +3625,7 @@ function frame(t){requestAnimationFrame(frame);let dt=(t-lastT)/1000;lastT=t;if(
   if(state==='boot'||state==='starting'){bootTick();return;}
   if(state==='shop'){shopFrame(dt);return;}
   if(state==='list'){listFrame(dt);return;}
+  if(state==='map'){mapFrame(dt);return;}
   if(state==='gunshop'){gunFrame(dt);return;}
   if(state!=='game')return;
   if(touchUI&&innerHeight>innerWidth)return;
