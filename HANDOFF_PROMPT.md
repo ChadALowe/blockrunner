@@ -145,3 +145,10 @@ The garage is a physical lock-up on the free ground right beside the flat tower 
 ## Map viewer and car health
 - Full-screen map: press M, or tap the minimap. State `'map'` (`openMap/closeMap/mapKey/mapFrame`), pan (drag/WASD), zoom (wheel, pinch, +/-), legend, and a waypoint (click/tap, Enter at crosshair, SET WAYPOINT/CLEAR buttons). Waypoint `WP` shows on the minimap, as an orange beam in the world, and clears within 11 m. Test: `br/test/map.js`.
 - Car health more than doubled: `CAR_TYPES` hp saloon 230, sports 200, van 290, police 330, police van 420. Older saved garage cars keep their stored hp.
+
+## Phone performance pass
+Measured with a draw-call tally (see `br/test/perf*.js`). Start-of-game frame on a phone profile went from ~630 draw calls / 372k tris / 8,300 scene objects to ~400 / 205k / ~3,000.
+- Pedestrians: only the nearest N are drawn (`PEDV` in `update`: 12 / 18 / 30 for Low / Med / High, range 56 / 76 / 100 m). Hidden ones skip animation. Car occupants are exempt.
+- `pruneHuman()` strips the ~90 hidden wardrobe meshes from every passer-by at spawn (the player and gang members keep theirs, as they change clothes).
+- `disposeHuman()` frees bone textures when a ped is removed. Textures used to grow ~2 per second of play; now flat.
+- Ideas left: merge car sub-meshes (a car is ~10 draw calls), cheaper skinned meshes for people (13 parts each), instance trees by chunk.

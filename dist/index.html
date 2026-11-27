@@ -1069,6 +1069,9 @@ const hairs=[0x2a1a10,0x5a3612,0x111111,0xc9a050,0x8a8a8a,0x7a2a10];
 const peds=[];
 function toWalk(p){
   p.block=blockAt(p.pos.x,p.pos.z);p.target=nearestWalk(p.block,p.pos.x,p.pos.z);p.state='walk';p.cross=null;p.crossing=false;if(p.nextAct===undefined)p.nextAct=rf(5,15);}
+// every character model carries ~100 hidden wardrobe meshes (hats, hair, tops...). Passers-by never change clothes,
+// so drop the hidden ones from the scene: the renderer walks ~8x fewer objects every frame.
+function pruneHuman(h){const kill=[];h.rig.traverse(o=>{if(o.isMesh&&!o.visible&&MANAGED.test(o.name))kill.push(o);});for(const o of kill)if(o.parent)o.parent.remove(o);}
 function spawnPed(o={}){
   const h=makeHuman(o.cop?copLook(!!o.seated):randomLook());scene.add(h.g);
   const dir=Math.random()<.5?1:-1;let x=o.x,z=o.z,blk=null,tg=0;
@@ -1081,8 +1084,10 @@ function spawnPed(o={}){
   if(!blk)toWalk(p);
   if(o.cop){p.state='cop';p.speed=5.6;}
   if(o.flee){p.state='flee';p.fleeT=7;p.threat=o.threat;}
-  peds.push(p);if(!o.noDeco&&!o.seated&&!o.cop&&!o.flee)decorateSpawn(p);return p;}
-function removePed(p){if(p.act)endAct(p);if(p.dog){removeDog(p.dog);p.dog=null;}if(p.car&&p.car.occ)for(const k in p.car.occ)if(p.car.occ[k]===p)p.car.occ[k]=null;if(p.inSeq)abortSeq(p.inSeq);if(p.h.g.parent)p.h.g.parent.remove(p.h.g);const k=peds.indexOf(p);if(k>=0)peds.splice(k,1);}
+  peds.push(p);if(!o.noDeco&&!o.seated&&!o.cop&&!o.flee)decorateSpawn(p);pruneHuman(h);return p;}
+// free the GPU bone textures and cloned materials of a person who has left the world (otherwise they pile up while you play)
+function disposeHuman(h){if(h.gone)return;h.gone=true;h.rig.traverse(o=>{if(o.isSkinnedMesh&&o.skeleton)o.skeleton.dispose();});for(const m of h.matList)m.dispose();}
+function removePed(p){if(p.act)endAct(p);if(p.dog){removeDog(p.dog);p.dog=null;}if(p.car&&p.car.occ)for(const k in p.car.occ)if(p.car.occ[k]===p)p.car.occ[k]=null;if(p.inSeq)abortSeq(p.inSeq);if(p.h.g.parent)p.h.g.parent.remove(p.h.g);disposeHuman(p.h);const k=peds.indexOf(p);if(k>=0)peds.splice(k,1);}
 let witnessT=0;
 function scare(x,z,r){for(const p of peds)if(p.state!=='dead'&&p.state!=='cop'&&p.state!=='gang'&&p.state!=='seated'&&p.state!=='thrown'&&p.state!=='rage'&&!p.inSeq&&d2(p.pos.x,p.pos.z,x,z)<r*r){if(p.act)endAct(p);p.cross=null;p.crossing=false;p.state='flee';p.fleeT=rf(5,9);p.threat={x,z};}
   if(r>=25&&now>witnessT){witnessT=now+rf(10,18);witnessCall(x,z);}}
@@ -1534,6 +1539,7 @@ function carHits(c){
     const lf=ox*fx+oz*fz,lr=ox*rx+oz*rz;if(Math.abs(lf)<2.65&&Math.abs(lr)<1.5&&player.pos.y<1.4){
       player.hitCD=.7;player.knock.set(c.vel.x*.9,0,c.vel.z*.9);player.vy=3+sp*.12;player.stun=2.3;shake=.6;thump(140,.2,.6);hurtPlayer(sp*2.1);}}
 }
+const PEDV=[];
 function updatePed(p,dt){
   const h=p.h;
   if(p.inSeq)return;
@@ -1568,6 +1574,7 @@ function updatePed(p,dt){
   if(p.act==='sit'&&p.state==='walk'){setAnim(h,'sit',.3);h.g.position.y=BENCH_Y;}else locoAnim(h,sp,p.state==='flee');
   // animation LOD: distant people animate at a lower rate
   const cq=d2(p.pos.x,p.pos.z,camera.position.x,camera.position.z);
+  if(!h.g.visible&&!p.cop&&p.gang===undefined&&p.target!=='player')return;
   if(cq>50*50&&!p.cop&&p.gang===undefined){p.lodAcc=(p.lodAcc||0)+dt;if(p.lodAcc<(cq>90*90?.15:.08))return;h.mixer.update(p.lodAcc);p.lodAcc=0;}
   else h.mixer.update(dt);
   if(p.gang===undefined&&!p.cop&&(p.act||p.pose||p.state==='walk'))lifePose(p,dt);
@@ -2051,7 +2058,11 @@ function update(dt){
     carPhysics(c,dt);}
   carCars();
   for(const c of cars)carHits(c);
-  for(const p of peds){updatePed(p,dt);const f=focus();p.h.g.visible=d2(p.pos.x,p.pos.z,f.x,f.z)<CULL*CULL*.45;}
+  {const f=focus(),R=[3200,5800,10000][S.gfx],cap=[12,18,30][S.gfx];PEDV.length=0;
+    for(const p of peds){updatePed(p,dt);p._d=d2(p.pos.x,p.pos.z,f.x,f.z);const inCar=p.seat||p.state==='seated'||p.inSeq;
+      if(inCar||p._d>=R)p.h.g.visible=p._d<R*1.6&&!!inCar;else PEDV.push(p);}
+    // every person is ~13 skinned parts, so only the nearest few are drawn on weaker devices
+    PEDV.sort((a,b)=>a._d-b._d);PEDV.forEach((p,i)=>{p.h.g.visible=i<cap;});}
   manage(dt);
   updateHeli(dt);updatePickups(dt);updateSpray(dt);updateMission(dt);updateShops(dt);updateLockup(dt);
   if(noteT>0){noteT-=dt;if(noteT<=0)noteEl.style.display='none';}
