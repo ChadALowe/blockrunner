@@ -930,11 +930,11 @@ function updateSeqs(dt){
     if(s.phase==='out'){const L=seatLocal(c,s.seat),w=carL2W(c,L.x,L.y,L.z),dp=doorPoint(c,s.side),k=Math.min(1,s.t/Math.max(.42,Math.hypot(w.x-dp.x,w.z-dp.z)/4));
       if(a.seat){unseat(a,c);}
       h.g.position.set(w.x+(dp.x-w.x)*k,w.y*(1-k),w.z+(dp.z-w.z)*k);a.pos.set(h.g.position.x,0,h.g.position.z);
-      a.facing=face+Math.PI*k;h.g.rotation.set(0,lerpAng(c.h+L.yaw,a.facing,k),0);setAnim(h,k<.6?'sit':'idle',.25);h.mixer.update(dt);
-      if(k>=1){s.t=0;s.phase='close';}
+      a.facing=face+Math.PI*k;h.g.rotation.set(0,lerpAng(c.h+L.yaw,a.facing,k),0);setAnim(h,k<.12?'sit':'idle',.22);h.mixer.update(dt);
+      if(k>=1){s.t=0;if(isPlayer(a)){endSeq(s);continue;}s.phase='close';} // the player walks off while the door swings shut by itself
       continue;}
     if(s.phase==='close'){c.doorTgt[s.side]=0;
-      if(!a.seat&&!isPlayer(a)){h.g.position.set(a.pos.x,0,a.pos.z);h.g.rotation.set(0,a.facing,0);h.mixer.update(dt);}
+      if(!a.seat){h.g.position.set(a.pos.x,0,a.pos.z);h.g.rotation.set(0,a.facing,0);if(s.type==='exit'||!isPlayer(a))setAnim(h,'idle',.2);h.mixer.update(dt);if(isPlayer(a))player.facing=a.facing;}
       if(s.t>.3){endSeq(s);}
       continue;}
   }}
