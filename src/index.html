@@ -1824,39 +1824,72 @@ function placeBusStops(){
     scene.add(g);
     addColBox(x,z,1.5,3.0,h,2.4,true);addCol(x+Math.sin(h)*-2.0-Math.cos(h)*.35-.1,x+Math.sin(h)*-2.0-Math.cos(h)*.35+.1,z+Math.cos(h)*-2.0+Math.sin(h)*.35-.1,z+Math.cos(h)*-2.0+Math.sin(h)*.35+.1,3,true);
     BUSSTOPS.push({x,z,h});}}
+function spawnWaiter(S){const lx=Math.cos(S.h),lz=-Math.sin(S.h),fx=Math.sin(S.h),fz=Math.cos(S.h),k=Math.random()-.5;
+  const p=spawnPed({x:S.x+lx*.05+fx*k*2.2,z:S.z+lz*.05+fz*k*2.2,noDeco:true});p.act='wait';p.actT=1e9;p.nextAct=1e9;p.facing=Math.atan2(-lx,-lz);p.stop=S;return p;}
+let busStopT=0;
+function updateBusStops(dt){busStopT-=dt;if(busStopT>0)return;busStopT=2.5;const f=focus();
+  for(const S of BUSSTOPS){if(d2(S.x,S.z,f.x,f.z)>85*85)continue;let n=0;for(const p of peds)if(p.stop===S&&p.act==='wait')n++;
+    if(n<2&&Math.random()<.6)spawnWaiter(S);}}
+// a bus pulls in: the queue boards, and some riders step off
+function busArrive(c,S){if(c.pax===undefined)c.pax=Math.floor(Math.random()*7);let n=0;
+  for(const p of peds)if(p.stop===S&&p.act==='wait'&&n<3&&p.state==='walk'){p.act='board';p.boardBus=c;p.actT=14;p.stop=null;n++;}
+  if(n)c.dwellT=Math.max(c.dwellT,9);
+  const out=Math.min(c.pax,Math.random()<.6?2:1);
+  for(let k=0;k<out;k++){c.pax--;const dp=doorPoint(c,'l');const q=spawnPed({x:dp.x+rf(-.3,.3),z:dp.z+rf(-.3,.3),noDeco:true});q.nextAct=rf(4,12);}}
 function busDwell(c,dt){
   if(c.dwellT>0){c.dwellT-=dt;if(c.dwellT<=0)c.stopSeen=c.dwellStop;return true;}
   if(c.stopSeen&&d2(c.pos.x,c.pos.z,c.stopSeen.x,c.stopSeen.z)>16*16)c.stopSeen=null;
   for(const S of BUSSTOPS){if(S===c.stopSeen)continue;
     const dx=S.x-c.pos.x,dz=S.z-c.pos.z;if(dx*dx+dz*dz>8*8)continue;
     if(dx*Math.cos(c.h)-dz*Math.sin(c.h)<1.5)continue;      // only a stop on the kerb (left) side
-    c.dwellStop=S;c.dwellT=4+Math.random()*3;return true;}
+    c.dwellStop=S;c.dwellT=4+Math.random()*3;busArrive(c,S);return true;}
   return false;}
 
-// ---------------- taxi fares: drive a black cab and passengers flag you down ----------------
-const TAXI={st:'off',x:0,z:0,dest:null,t:0,fare:0,dist:0,wait:0,cool:0,beam:null};
+// ---------------- taxi fares: drive a black cab, a real passenger flags you down and rides in the back ----------------
+const TAXI={st:'off',x:0,z:0,h:0,dest:null,t:0,fare:0,dist:0,wait:0,cool:0,beam:null,ped:null,boarding:false,boarded:false};
 function taxiBeam(col){if(!TAXI.beam){TAXI.beam=new THREE.Mesh(new THREE.CylinderGeometry(.7,.7,80,10,1,true),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.4,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));TAXI.beam.frustumCulled=false;scene.add(TAXI.beam);}
   TAXI.beam.material.color.setHex(col);return TAXI.beam;}
 function taxiPick(minD,maxD,from){const f=from||focus();for(let k=0;k<60;k++){const s=roadSpot(true);if(!s)continue;const d=Math.sqrt(d2(s.x,s.z,f.x,f.z));if(d>=minD&&d<=maxD)return s;}return null;}
-function taxiEnd(msg,cool){TAXI.st='off';TAXI.dest=null;if(TAXI.beam)TAXI.beam.visible=false;TAXI.cool=cool||4;if(msg)note(msg,3.5);}
+// the passenger gets out (or walks off if they never got in)
+function taxiRelease(){const p=TAXI.ped;TAXI.ped=null;TAXI.boarding=false;TAXI.boarded=false;if(!p||!peds.includes(p)||p.state==='dead')return;
+  if(p.inSeq)abortSeq(p.inSeq);
+  if(p.state==='seated'&&p.car){const car=p.car,side=doorOfSeat(car,p.seat);
+    const s=startSeq('exit',p,car,side,{onDone:()=>{p.state='walk';toWalk(p);p.nextAct=rf(5,12);}});
+    if(!s){unseat(p,car,doorPoint(car,side));p.state='walk';toWalk(p);}}
+  else{if(p.act)endAct(p);p.state==='walk'||(p.state='walk');}}
+function taxiEnd(msg,cool){taxiRelease();TAXI.st='off';TAXI.dest=null;if(TAXI.beam)TAXI.beam.visible=false;TAXI.cool=cool||4;if(msg)note(msg,3.5);}
+function taxiSpawnPed(){const lx=Math.cos(TAXI.h),lz=-Math.sin(TAXI.h);
+  const p=spawnPed({x:TAXI.x+lx*1.6,z:TAXI.z+lz*1.6,noDeco:true});p.act='hail';p.actT=1e9;p.nextAct=1e9;p.facing=Math.atan2(-lx,-lz);TAXI.ped=p;TAXI.pedMade=true;}
 function updateTaxi(dt){
   const c=player.car,ok=c&&c.type==='taxi'&&!player.dead&&!c.burnt;
   if(!ok){if(TAXI.st!=='off')taxiEnd(TAXI.st==='ride'?'Your passenger got out':null,6);return;}
   if(TAXI.cool>0){TAXI.cool-=dt;return;}
   if(TAXI.st==='off'){if(stars()>0)return;const s=taxiPick(70,190);if(!s)return;
-    TAXI.x=s.x;TAXI.z=s.z;TAXI.st='wait';TAXI.wait=0;taxiBeam(0xffd23f).visible=true;TAXI.beam.position.set(s.x,40,s.z);
+    TAXI.x=s.x;TAXI.z=s.z;TAXI.h=s.h;TAXI.st='wait';TAXI.wait=0;TAXI.ped=null;TAXI.pedMade=false;TAXI.boarding=false;TAXI.boarded=false;
+    taxiBeam(0xffd23f).visible=true;TAXI.beam.position.set(s.x,40,s.z);
     note('Fare! Pick up your passenger at the <b>yellow marker</b>',4.5);blip(880);return;}
   if(stars()>0&&TAXI.st==='wait'){taxiEnd(null,8);return;}
   const slow=Math.abs(c.F)<2.8;
   if(TAXI.beam)TAXI.beam.material.opacity=.3+.15*Math.sin(now*4);
   if(TAXI.st==='wait'){TAXI.wait+=dt;
-    if(slow&&d2(c.pos.x,c.pos.z,TAXI.x,TAXI.z)<8*8){const s=taxiPick(180,380,{x:TAXI.x,z:TAXI.z});if(!s){TAXI.wait=0;return;}
+    const dm=d2(c.pos.x,c.pos.z,TAXI.x,TAXI.z);
+    if(!TAXI.pedMade&&dm<110*110)taxiSpawnPed();
+    const p=TAXI.ped;
+    if(TAXI.pedMade&&(!p||!peds.includes(p)||p.state==='dead'||(p.state!=='walk'&&p.state!=='seated'&&!p.inSeq))){taxiEnd('Your passenger ran off',5);return;}
+    if(!TAXI.boarding){
+      if(p&&slow&&dm<8*8){p.act=null;p.pose=null;const s=startSeq('enter',p,c,'bl',{seat:'bl',onDone:()=>{TAXI.boarded=true;}});if(s)TAXI.boarding=true;}
+      else if(TAXI.wait>150)taxiEnd('Your passenger gave up waiting',6);
+      return;}
+    // they are walking to the back door
+    if(p&&p.inSeq&&p.inSeq.phase==='walk'&&(Math.abs(c.F)>5||dm>16*16)){abortSeq(p.inSeq);TAXI.boarding=false;p.act='hail';p.actT=1e9;}
+    if(TAXI.boarded){const s=taxiPick(180,380,{x:TAXI.x,z:TAXI.z});if(!s){TAXI.boarded=false;taxiEnd('No fare available',5);return;}
       TAXI.dest={x:s.x,z:s.z};TAXI.dist=Math.sqrt(d2(TAXI.x,TAXI.z,s.x,s.z));TAXI.st='ride';TAXI.t=0;TAXI.fare=Math.round(15+TAXI.dist*.22);
-      taxiBeam(0x4fe08a).visible=true;TAXI.beam.position.set(s.x,40,s.z);note('Passenger aboard. Take them to the <b>green marker</b>',4.5);blip(1100);}
-    else if(TAXI.wait>150)taxiEnd('Your passenger gave up waiting',6);
+      taxiBeam(0x4fe08a).visible=true;TAXI.beam.position.set(s.x,40,s.z);say(p,'Take me to the green marker, driver!',3.2);note('Passenger aboard. Take them to the <b>green marker</b>',4.5);blip(1100);}
     return;}
-  if(TAXI.st==='ride'){TAXI.t+=dt;
+  if(TAXI.st==='ride'){TAXI.t+=dt;const p=TAXI.ped;
+    if(!p||p.state!=='seated'||p.car!==c){taxiEnd('You lost your passenger',5);return;}
     if(slow&&d2(c.pos.x,c.pos.z,TAXI.dest.x,TAXI.dest.z)<9*9){const bonus=TAXI.t<TAXI.dist/6?Math.round(TAXI.fare*.5):0;addMoney(TAXI.fare+bonus);
+      say(p,pick(['Cheers! Keep the change.','Brilliant, thanks mate.','Lovely driving, that.']),3);
       taxiEnd('Fare paid <b>$'+(TAXI.fare+bonus)+'</b>'+(bonus?' (fast ride bonus)':''),3);blip(1300);}}}
 
 function populate(){
@@ -1954,7 +1987,7 @@ function update(dt){
   for(const c of cars)carVisual(c,dt);
   updateCamera(dt);
   const f=focus();sun.position.set(f.x+SUNOFF.x,SUNOFF.y,f.z+SUNOFF.z);sun.target.position.set(f.x,0,f.z);
-  updateWaypoint();updateTaxi(dt);updateHUD();updateAudio();
+  updateWaypoint();updateTaxi(dt);updateBusStops(dt);updateHUD();updateAudio();
 }
 // ======================================================================
 // SETTINGS
@@ -3435,6 +3468,8 @@ function updateWalker(p,dt){
     if(A==='toBench'){const S=benchSeat(p.bench.B,p.bench.k),d=Math.hypot(S.x-p.pos.x,S.z-p.pos.z);
       if(d<.2||p.actT<0){if(d>1){endAct(p);return 0;}p.pos.set(S.x,0,S.z);p.facing=p.bench.B.yaw;p.act='sit';p.actT=rf(12,28);return 0;}return walkTo(p,S.x,S.z,p.speed,dt);}
     if(A==='sit'){p.facing=p.bench.B.yaw;if(p.actT<0){const B=p.bench.B;endAct(p);p.pos.x+=Math.sin(B.yaw)*.6;p.pos.z+=Math.cos(B.yaw)*.6;toWalk(p);}return 0;}
+    if(A==='board'){const b=p.boardBus;if(!b||!cars.includes(b)||b.burnt){endAct(p);return 0;}const dp=doorPoint(b,'l');const sp=walkTo(p,dp.x,dp.z,1.9,dt);
+      if(Math.hypot(dp.x-p.pos.x,dp.z-p.pos.z)<1.1||p.actT<0){b.pax=(b.pax||0)+1;removePed(p);return 0;}return sp||1.9;}
     if(A==='phoneWalk'){if(p.actT<0)endAct(p);}
     else{if(A==='chat'&&p.with){p.facing=lerpAng(p.facing,Math.atan2(p.with.pos.x-p.pos.x,p.with.pos.z-p.pos.z),dt*5);if(!peds.includes(p.with)||p.with.state!=='walk'){endAct(p);return 0;}}
       if(A==='browse')p.facing=lerpAng(p.facing,p.actFace,dt*4);
@@ -3459,6 +3494,7 @@ function lifePose(p,dt){const h=p.h,A=p.act||p.pose,t=now+p.phase;
     if(A==='chat'&&Math.sin(t*.9)>.3){setBone(h,'upperarm_L',-.3-.2*Math.max(0,-s),0,-.2);setBone(h,'forearm_L',-.8-.4*Math.max(0,-c),0,0);}}
   else if(A==='smoke'){const k=clamp((Math.sin(t*.9)-.35)*3,0,1);setBone(h,'upperarm_R',-.15-.35*k,0,.25+.35*k);setBone(h,'forearm_R',-.4-2.0*k,0,0);}
   else if(A==='sit'){setBone(h,'upperarm_L',-.42,0,.08);setBone(h,'forearm_L',-1.15,0,0);setBone(h,'upperarm_R',-.42,0,-.08);setBone(h,'forearm_R',-1.15,0,0);if(Math.sin(t*.4)>.6)setBone(h,'head',.15,Math.sin(t*.7)*.5,0);}
+  else if(A==='hail'){const w=Math.sin(now*5+p.phase);setBone(h,'upperarm_R',-2.7,0,.2);setBone(h,'forearm_R',-.5+.35*w,0,0);}
   else if(A==='handsup'){setBone(h,'upperarm_L',-2.85,0,-.35);setBone(h,'forearm_L',-.35,0,0);setBone(h,'upperarm_R',-2.85,0,.35);setBone(h,'forearm_R',-.35,0,0);}
   // heads turn to look at you
   if(p.state==='walk'&&A!=='handsup'&&!player.car){const dx=player.pos.x-p.pos.x,dz=player.pos.z-p.pos.z,q=dx*dx+dz*dz;let want=0;

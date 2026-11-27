@@ -161,3 +161,8 @@ Measured with a draw-call tally (see `br/test/perf*.js`). Start-of-game frame on
 - Taxi fares (`TAXI`, `updateTaxi`): drive any taxi. A yellow beam/`T` marker shows the passenger; stop within 8 m to pick them up, then drive to the green `$` marker. Fare = $15 + 0.22/m, +50% for a fast ride. Cancelled by leaving the cab or by a wanted level.
 - Also fixed: the map waypoint never cleared/pulsed in the open world (its update hook sat in the flat's update); now in `update()`.
 - Tests: `br/test/bus.js`, `bus2.js`.
+
+## Passengers (update)
+- Taxi fares now use a real ped: `taxiSpawnPed` (act `hail`, arm raised) appears at the yellow marker when you are within 110 m, boards the rear-left seat `bl` through the normal enter sequence, and leaves via an exit sequence at the green marker (`taxiRelease`). If they are killed or lost the fare ends.
+- Bus stops: `updateBusStops` keeps ~2 waiting peds (act `wait`) at each stop near the player. `busArrive` makes up to 3 of them walk to the bus's left door (act `board`) and vanish into it (`bus.pax`), and 1-2 riders step off. Dwell lasts 9 s when people board.
+- Tests: `br/test/bus3.js`.
