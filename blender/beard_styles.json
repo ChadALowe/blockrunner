@@ -1,0 +1,9 @@
+[["stubble","Stubble",[],"light"],["heavy","Heavy stubble",[],"heavy"],["tache","Moustache",["m_classic"],""],["chevron","Chevron",["m_chevron"],""],
+ ["pencil","Pencil moustache",["m_pencil"],""],["handlebar","Handlebar",["m_handlebar"],""],["walrus","Walrus",["m_walrus"],""],["horseshoe","Horseshoe",["m_horseshoe"],""],
+ ["fu","Fu Manchu",["m_fu"],""],["toothbrush","Toothbrush",["m_toothbrush"],""],["soul","Soul patch",["c_soul"],""],["goatee","Goatee",["m_classic","c_tuft"],""],
+ ["chinpuff","Chin puff",["c_tuft"],""],["vandyke","Van Dyke",["m_handlebar","c_point"],""],["circle","Circle beard",["m_classic","c_circle"],""],
+ ["anchor","Anchor",["m_pencil","c_point","j_strap"],""],["strap","Chin strap",["j_strap"],""],["curtain","Chin curtain",["j_curtain"],""],
+ ["chops","Mutton chops",["j_chops"],""],["friendly","Friendly chops",["j_chops","m_chevron"],""],["short","Short beard",["f_short","m_classic"],""],
+ ["boxed","Boxed beard",["f_short","m_chevron"],"light"],["long","Long beard",["f_long","m_classic"],""],["bushy","Bushy beard",["f_bushy","m_walrus"],""],
+ ["duck","Ducktail",["f_duck","m_classic"],""],["viking","Viking",["f_viking","m_walrus"],""],["garibaldi","Garibaldi",["f_bushy","m_chevron"],""],
+ ["stubtache","Stubble and moustache",["m_classic"],"light"],["stubgoatee","Stubble and goatee",["m_classic","c_tuft"],"light"],["balbo","Balbo",["m_chevron","c_point","c_soul"],""]]
