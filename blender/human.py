@@ -494,6 +494,22 @@ def build(kind, hair_styles):
     bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=hr[0] + .03, depth=.025, location=(hc.x, hc.y - .005, hc.z + .135)); a2 = bpy.context.object
     a3 = hbox((.17, .09, .012), (hc.x, hc.y - hr[1] - .03, hc.z + .055))
     rigid(joinall([a1, a2, a3], 'hat_police'), 'hat')
+    # white band round the peaked cap (UK traffic officers)
+    mat('trim', 0xf2f2f2)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=hr[0] + .021, depth=.03, location=(hc.x, hc.y + .005, hc.z + .07)); rigid(bpy.context.object, 'trim'); bpy.context.object.name = 'hat_police_band'
+    # custodian helmet (the British bobby's tall domed helmet) with a silver badge and top knob
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=20, ring_count=14, location=(hc.x, hc.y + .006, hc.z + .045)); hd = bpy.context.object
+    hd.scale = (hr[0] + .03, hr[1] + .042, .215); bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    bm = bmesh.new(); bm.from_mesh(hd.data)
+    bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(0, 0, -.012), plane_no=(0, .25, 1), clear_inner=True)
+    bm.to_mesh(hd.data); bm.free()
+    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=hr[0] + .05, depth=.012, location=(hc.x, hc.y + .004, hc.z + .036)); hb = bpy.context.object
+    hb.scale = (1, (hr[1] + .06) / (hr[0] + .05), 1); bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=.016, depth=.04, location=(hc.x, hc.y + .006, hc.z + .045 + .215 + .01)); hk = bpy.context.object
+    rigid(joinall([hd, hb, hk], 'hat_helmet'), 'hat')
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=10, ring_count=8, radius=1, location=(hc.x, hc.y - hr[1] - .036, hc.z + .135)); bg = bpy.context.object
+    bg.scale = (.032, .01, .04); bpy.ops.object.transform_apply(location=False, rotation=False, scale=True); bg.rotation_euler.x = math.radians(-14)
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False); rigid(bg, 'trim'); bg.name = 'hat_helmet_badge'
     # ---------- tops: hoodie hood (worn with the long-sleeve top) and an open jacket shell
     bpy.ops.mesh.primitive_torus_add(major_radius=.105, minor_radius=.045, major_segments=20, minor_segments=8, location=(0, .02, 1.5), rotation=(math.radians(-14), 0, 0))
     hood = bpy.context.object; hood.scale = (1.05, 1.15, 1); bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)

@@ -608,10 +608,10 @@ function prepHuman(g){
   return{scene:g.scene,clips:g.animations,rest};}
 const gunGeo=new THREE.BoxGeometry(.05,.07,.2);gunGeo.translate(0,0,.06);
 // ---------------- wardrobe ----------------
-const WARD={"tops": [["tee", "T-shirt", [], "top", "top", "skin"], ["long", "Long sleeve", [], "top", "top", "top"], ["vest", "Vest", [], "top", "skin", "skin"], ["polo", "Polo shirt", ["top_collar", "top_placket_short", "top_placket_short_btn"], "top", "top", "skin"], ["shirt", "Button shirt", ["top_collar", "top_placket", "top_placket_btn", "top_cuffs"], "top", "top", "top"], ["jumper", "Jumper", ["top_ribs", "top_cuffs"], "top", "top", "top"], ["hoodie", "Hoodie", ["top_hood"], "top", "top", "top"], ["tracksuit", "Tracksuit top", ["top_zip", "top_stripes_arm", "top_cuffs"], "top", "top", "top"], ["football", "Football shirt", ["top_stripes"], "top", "top", "skin"], ["jacket", "Jacket", ["top_jacket"], "white", "top", "top"], ["blazer", "Blazer and tie", ["top_blazer", "top_lapels", "top_tie", "top_bcollar", "top_blazer_btn"], "white", "top", "top"], ["blazeropen", "Blazer, open neck", ["top_blazer", "top_lapels", "top_bcollar", "top_blazer_btn"], "white", "top", "top"], ["puffer", "Puffer jacket", ["top_puffer", "top_puffer_sleeves"], "top", "top", "top"], ["gilet", "Gilet", ["top_gilet"], "trim", "trim", "trim"], ["parka", "Parka", ["top_parka", "top_hood"], "trim", "top", "top"], ["hivis", "Hi-vis vest", ["top_hivis", "top_hivis_bands"], "trim", "trim", "skin"], ["bigtee", "Oversized tee", ["top_bigtee", "top_bigtee_sleeves"], "top", "top", "skin"], ["jersey", "Basketball jersey", ["top_jersey", "top_jersey_trim", "top_jersey_num"], "top", "skin", "skin"], ["flannel", "Open flannel", ["top_flannel", "top_flannel_check", "top_flannel_cuffs", "top_collar"], "white", "top", "top"]], "bottoms": [["long", "Trousers", [], "bot", "bot"], ["short", "Shorts", [], "bot", "skin"], ["joggers", "Joggers", ["legs_stripes", "legs_cuffs"], "bot", "bot"], ["cargo", "Cargo shorts", ["legs_pockets"], "bot", "skin"], ["skirt", "Short skirt", ["skirt_short"], "skin", "skin"], ["longskirt", "Long skirt", ["skirt_long"], "skin", "skin"], ["baggy", "Baggy jeans", ["legs_seat", "legs_baggy", "legs_boxers"], "bot", "bot"], ["longshorts", "Long baggy shorts", ["legs_seat", "legs_longshorts"], "bot", "skin"]], "shoes": [["trainers", "Trainers", ["shoes_soles"]], ["hitops", "Hi-tops", ["shoes_hitop", "shoes_soles"]], ["boots", "Boots", ["shoes_boots"]], ["wellies", "Wellies", ["shoes_wellies"]], ["smart", "Smart shoes", []]], "hats": [["none", "No hat", []], ["baseball", "Baseball cap", ["hat_baseball"]], ["backwards", "Backwards cap", ["hat_backwards"]], ["beanie", "Beanie", ["hat_beanie"]], ["bucket", "Bucket hat", ["hat_bucket"]], ["flat", "Flat cap", ["hat_flat"]], ["trilby", "Trilby", ["hat_trilby", "hat_trilby_band"]], ["hard", "Hard hat", ["hat_hard"]], ["bandana", "Bandana", ["hat_bandana"]], ["durag", "Durag", ["hat_durag"]], ["snapback", "Snapback", ["hat_snapback"]], ["police", "Police cap", ["hat_police"]]], "eyewear": [["none", "None", []], ["sunglasses", "Sunglasses", ["acc_sunglasses"]], ["glasses", "Glasses", ["acc_glasses"]], ["aviators", "Aviators", ["acc_aviators"]]], "extras": [["none", "None", []], ["chain", "Gold chain", ["acc_chain"]], ["scarf", "Scarf", ["acc_scarf"]], ["backpack", "Backpack", ["acc_backpack"]], ["headphones", "Headphones", ["acc_headphones"]], ["bigchain", "Big chain", ["acc_bigchain"]], ["facemask", "Face bandana", ["acc_facebandana"]]]};
+const WARD={"tops": [["tee", "T-shirt", [], "top", "top", "skin"], ["long", "Long sleeve", [], "top", "top", "top"], ["vest", "Vest", [], "top", "skin", "skin"], ["polo", "Polo shirt", ["top_collar", "top_placket_short", "top_placket_short_btn"], "top", "top", "skin"], ["shirt", "Button shirt", ["top_collar", "top_placket", "top_placket_btn", "top_cuffs"], "top", "top", "top"], ["jumper", "Jumper", ["top_ribs", "top_cuffs"], "top", "top", "top"], ["hoodie", "Hoodie", ["top_hood"], "top", "top", "top"], ["tracksuit", "Tracksuit top", ["top_zip", "top_stripes_arm", "top_cuffs"], "top", "top", "top"], ["football", "Football shirt", ["top_stripes"], "top", "top", "skin"], ["jacket", "Jacket", ["top_jacket"], "white", "top", "top"], ["blazer", "Blazer and tie", ["top_blazer", "top_lapels", "top_tie", "top_bcollar", "top_blazer_btn"], "white", "top", "top"], ["blazeropen", "Blazer, open neck", ["top_blazer", "top_lapels", "top_bcollar", "top_blazer_btn"], "white", "top", "top"], ["puffer", "Puffer jacket", ["top_puffer", "top_puffer_sleeves"], "top", "top", "top"], ["gilet", "Gilet", ["top_gilet"], "trim", "trim", "trim"], ["parka", "Parka", ["top_parka", "top_hood"], "trim", "top", "top"], ["hivis", "Hi-vis vest", ["top_hivis", "top_hivis_bands"], "trim", "trim", "skin"], ["bigtee", "Oversized tee", ["top_bigtee", "top_bigtee_sleeves"], "top", "top", "skin"], ["jersey", "Basketball jersey", ["top_jersey", "top_jersey_trim", "top_jersey_num"], "top", "skin", "skin"], ["flannel", "Open flannel", ["top_flannel", "top_flannel_check", "top_flannel_cuffs", "top_collar"], "white", "top", "top"], ["uniform", "Police uniform", ["top_hivis", "top_hivis_bands"], "top", "top", "top"]], "bottoms": [["long", "Trousers", [], "bot", "bot"], ["short", "Shorts", [], "bot", "skin"], ["joggers", "Joggers", ["legs_stripes", "legs_cuffs"], "bot", "bot"], ["cargo", "Cargo shorts", ["legs_pockets"], "bot", "skin"], ["skirt", "Short skirt", ["skirt_short"], "skin", "skin"], ["longskirt", "Long skirt", ["skirt_long"], "skin", "skin"], ["baggy", "Baggy jeans", ["legs_seat", "legs_baggy", "legs_boxers"], "bot", "bot"], ["longshorts", "Long baggy shorts", ["legs_seat", "legs_longshorts"], "bot", "skin"]], "shoes": [["trainers", "Trainers", ["shoes_soles"]], ["hitops", "Hi-tops", ["shoes_hitop", "shoes_soles"]], ["boots", "Boots", ["shoes_boots"]], ["wellies", "Wellies", ["shoes_wellies"]], ["smart", "Smart shoes", []]], "hats": [["none", "No hat", []], ["baseball", "Baseball cap", ["hat_baseball"]], ["backwards", "Backwards cap", ["hat_backwards"]], ["beanie", "Beanie", ["hat_beanie"]], ["bucket", "Bucket hat", ["hat_bucket"]], ["flat", "Flat cap", ["hat_flat"]], ["trilby", "Trilby", ["hat_trilby", "hat_trilby_band"]], ["hard", "Hard hat", ["hat_hard"]], ["bandana", "Bandana", ["hat_bandana"]], ["durag", "Durag", ["hat_durag"]], ["snapback", "Snapback", ["hat_snapback"]], ["police", "Police cap", ["hat_police", "hat_police_band"]], ["helmet", "Police helmet", ["hat_helmet", "hat_helmet_badge"]]], "eyewear": [["none", "None", []], ["sunglasses", "Sunglasses", ["acc_sunglasses"]], ["glasses", "Glasses", ["acc_glasses"]], ["aviators", "Aviators", ["acc_aviators"]]], "extras": [["none", "None", []], ["chain", "Gold chain", ["acc_chain"]], ["scarf", "Scarf", ["acc_scarf"]], ["backpack", "Backpack", ["acc_backpack"]], ["headphones", "Headphones", ["acc_headphones"]], ["bigchain", "Big chain", ["acc_bigchain"]], ["facemask", "Face bandana", ["acc_facebandana"]]]};
 const WBY={};for(const k in WARD){WBY[k]={};for(const r of WARD[k])WBY[k][r[0]]=r;}
-const W_TOPS=WARD.tops.map(r=>[r[0],r[1]]),W_BOTTOMS=WARD.bottoms.map(r=>[r[0],r[1]]),W_SHOES=WARD.shoes.map(r=>[r[0],r[1]]);
-const W_HATS=WARD.hats.filter(r=>r[0]!=='police').map(r=>[r[0],r[1]]),W_EYE=WARD.eyewear.map(r=>[r[0],r[1]]),W_EXTRA=WARD.extras.map(r=>[r[0],r[1]]);
+const W_TOPS=WARD.tops.filter(r=>r[0]!=='uniform').map(r=>[r[0],r[1]]),W_BOTTOMS=WARD.bottoms.map(r=>[r[0],r[1]]),W_SHOES=WARD.shoes.map(r=>[r[0],r[1]]);
+const W_HATS=WARD.hats.filter(r=>r[0]!=='police'&&r[0]!=='helmet').map(r=>[r[0],r[1]]),W_EYE=WARD.eyewear.map(r=>[r[0],r[1]]),W_EXTRA=WARD.extras.map(r=>[r[0],r[1]]);
 const MANAGED=/^(hair_|beard_|hat_|top_|legs_|skirt_|shoes_|acc_)/;
 const W_HAIR={male:[['none','Bald'],['hair_buzz','Buzz cut'],['hair_short','Short'],['hair_afro','Afro'],['hair_mohawk','Mohawk'],['hair_long','Long'],['hair_pony','Ponytail']],
   female:[['hair_long','Long'],['hair_bob','Bob'],['hair_bun','Bun'],['hair_pony','Ponytail'],['hair_afro','Afro'],['hair_short','Short'],['hair_buzz','Buzz cut']]};
@@ -743,8 +743,9 @@ function gangLook(gi){
   L.hat=pick(['bandana','bandana','durag','snapback','backwards','none']);L.hatCol=g.c;
   L.eyewear=r()<.3?'sunglasses':'none';L.extra=r()<.4?pick(['chain','bigchain']):'none';L.gang=g.c;
   return L;}
-function copLook(){return{kind:'male',skin:pick(SKINS),eye:pick(EYES),hair:'hair_short',hairCol:pick(C_HAIR.slice(0,7))[0],beard:Math.random()<.3?pick(['tache','chevron','stubble','pencil']):'none',
-  hat:'police',hatCol:0x101830,top:'long',topCol:0x22335e,trim:0x22335e,bottom:'long',botCol:0x1a2442,shoes:'boots',shoeCol:0x111111,eyewear:Math.random()<.15?'aviators':'none',extra:'none',gun:true};}
+// UK police: black uniform under a hi-vis vest; custodian helmet on foot, peaked cap in the car
+function copLook(inCar){return{kind:'male',skin:pick(SKINS),eye:pick(EYES),hair:'hair_short',hairCol:pick(C_HAIR.slice(0,7))[0],beard:Math.random()<.3?pick(['tache','chevron','stubble','pencil']):'none',
+  hat:inCar?'police':'helmet',hatCol:0x111216,top:'uniform',topCol:0x18191d,trim:0xe8e8e8,bottom:'long',botCol:0x18191d,shoes:'boots',shoeCol:0x111111,eyewear:Math.random()<.15?'aviators':'none',extra:'none',gun:true};}
 const LOOK_KEY='blockrunner_look';
 const PLAYER_DEFAULT={kind:'male',skin:0x9c6a48,eye:0x4a2e1a,hair:'hair_short',hairCol:0x111111,beard:'none',hat:'none',hatCol:0x1f4e9c,top:'tee',topCol:0xf2f2f2,trim:0xf2f2f2,bottom:'long',botCol:0x34507e,shoes:'trainers',shoeCol:0x161616,eyewear:'none',extra:'none'};
 let PLAYER_LOOK=Object.assign({},PLAYER_DEFAULT,(()=>{try{return JSON.parse(localStorage.getItem(LOOK_KEY))||{};}catch(e){return{};}})(),{gun:true});
@@ -847,7 +848,7 @@ const peds=[];
 function toWalk(p){
   p.block=blockAt(p.pos.x,p.pos.z);p.target=nearestWalk(p.block,p.pos.x,p.pos.z);p.state='walk';p.cross=null;p.crossing=false;if(p.nextAct===undefined)p.nextAct=rf(5,15);}
 function spawnPed(o={}){
-  const h=makeHuman(o.cop?copLook():randomLook());scene.add(h.g);
+  const h=makeHuman(o.cop?copLook(!!o.seated):randomLook());scene.add(h.g);
   const dir=Math.random()<.5?1:-1;let x=o.x,z=o.z,blk=null,tg=0;
   if(o.blk){blk=o.blk;tg=o.tg;}
   if(x===undefined){const sp=lifeSpawnPos(!!o.far);if(sp){x=sp.x;z=sp.z;blk=sp.blk;tg=sp.tg;}
@@ -896,7 +897,7 @@ function initAudio(){if(AC){AC.resume&&AC.resume();return;}try{
   engOsc=AC.createOscillator();engOsc.type='sawtooth';engOsc2=AC.createOscillator();engOsc2.type='square';
   engFilt=AC.createBiquadFilter();engFilt.type='lowpass';engFilt.frequency.value=500;engGain=AC.createGain();engGain.gain.value=0;
   const g2=AC.createGain();g2.gain.value=.4;engOsc.connect(engFilt);engOsc2.connect(g2).connect(engFilt);engFilt.connect(engGain).connect(master);engOsc.start();engOsc2.start();
-  sirOsc=AC.createOscillator();sirOsc.type='sine';sirOsc.frequency.value=760;const lfo=AC.createOscillator();lfo.frequency.value=.55;const lg=AC.createGain();lg.gain.value=230;lfo.connect(lg).connect(sirOsc.frequency);lfo.start();
+  sirOsc=AC.createOscillator();sirOsc.type='triangle';sirOsc.frequency.value=740;const lfo=AC.createOscillator();lfo.type='square';lfo.frequency.value=.95;const lg=AC.createGain();lg.gain.value=118;lfo.connect(lg).connect(sirOsc.frequency);lfo.start();
   sirGain=AC.createGain();sirGain.gain.value=0;sirOsc.connect(sirGain).connect(master);sirOsc.start();
   hornGain=AC.createGain();hornGain.gain.value=0;for(const f of[392,494]){const o=AC.createOscillator();o.type='square';o.frequency.value=f;o.connect(hornGain);o.start();}
   const hf=AC.createBiquadFilter();hf.type='lowpass';hf.frequency.value=1800;hornGain.connect(hf).connect(master);
@@ -1409,8 +1410,8 @@ function carVisual(c,dt){
   if(!c.burnt)c.spin+=c.F*dt/.42;
   for(const w of c.m.wheels)w.spin.rotation.x=c.spin;
   c.m.wheels[0].piv.rotation.y=c.m.wheels[1].piv.rotation.y=-c.steer*.5;
-  if(c.m.bar&&!c.burnt){if(c.sirens&&c!==player.car){const on=Math.floor(now*6)%2===0;c.m.bar[0].color.setHex(on?0xff2020:0x440000);c.m.bar[1].color.setHex(on?0x000044:0x2040ff);}
-    else{c.m.bar[0].color.setHex(0x550000);c.m.bar[1].color.setHex(0x000055);}}
+  if(c.m.bar&&!c.burnt){if(c.sirens&&c!==player.car){const on=Math.floor(now*6)%2===0;c.m.bar[0].color.setHex(on?0x3a6cff:0x000a33);c.m.bar[1].color.setHex(on?0x000a33:0x3a6cff);}
+    else{c.m.bar[0].color.setHex(0x0a1a55);c.m.bar[1].color.setHex(0x0a1a55);}}
   const f=focus();g.visible=d2(c.pos.x,c.pos.z,f.x,f.z)<CULL*CULL;
   // smoke / fire
   c.smokeT-=dt;
@@ -1633,7 +1634,7 @@ function drawMini(){
   miniTurf();
   for(const p of peds){if(p.gang===undefined||p.follow||p.state==='dead'||d2(p.pos.x,p.pos.z,f.x,f.z)>90*90)continue;const hot=p.target==='player';mctx.fillStyle=hot?'#ff2a2a':GANG[p.gang].css;mctx.beginPath();mctx.arc(p.pos.x,p.pos.z,hot?2.2:1.5,0,7);mctx.fill();}
   for(const c of cars){if(c===player.car)continue;
-    if(c.ai==='police'&&!c.burnt){mctx.fillStyle=Math.floor(now*5)%2?'#ff3030':'#3070ff';mctx.beginPath();mctx.arc(c.pos.x,c.pos.z,2.6,0,7);mctx.fill();}
+    if(c.ai==='police'&&!c.burnt){mctx.fillStyle=Math.floor(now*5)%2?'#9fc0ff':'#3070ff';mctx.beginPath();mctx.arc(c.pos.x,c.pos.z,2.6,0,7);mctx.fill();}
     else{mctx.fillStyle=c.burnt?'#222':'rgba(255,255,255,.75)';mctx.fillRect(c.pos.x-1.2,c.pos.z-1.2,2.4,2.4);}}
   const fa=player.car?player.car.h:player.facing,ax=Math.sin(fa),az=Math.cos(fa),bx=-az,bz=ax;
   mctx.fillStyle='#fff';mctx.strokeStyle='#000';mctx.lineWidth=1;mctx.beginPath();
@@ -1643,7 +1644,7 @@ function drawMini(){
   for(const S of SHOPS)miniIcon(S.x,S.z,{barber:'#6aa8ff',clothes:'#4fd07a',guns:'#ff5a4a'}[S.type],{barber:'B',clothes:'C',guns:'G'}[S.type],7,84);
   if(!mission)for(const d of MDEFS)miniIcon(d.x,d.z,'#ffd23f',d.letter,7,84);
   if(ATTACK){const b=blocks[ATTACK.bi];miniIcon(b.cx,b.cz,'#ff3030','!',7,84);}
-  if(heli&&!heli.dead){const p=miniXY(heli.pos.x,heli.pos.z,84);mctx.fillStyle=Math.floor(now*5)%2?'#ff3030':'#3070ff';mctx.fillRect(p[0]-4,p[1]-4,8,8);}
+  if(heli&&!heli.dead){const p=miniXY(heli.pos.x,heli.pos.z,84);mctx.fillStyle=Math.floor(now*5)%2?'#9fc0ff':'#3070ff';mctx.fillRect(p[0]-4,p[1]-4,8,8);}
   if(mission&&mission.blip){const b=mission.blip;miniIcon(b.x,b.z,b.col,null,6,84);}
 }
 function updateHUD(){
@@ -1694,7 +1695,8 @@ function manage(dt){
   for(const rb of roadblocks.slice()){rb.t+=dt;const far=rb.cars.every(c=>c===player.car||!cars.includes(c)||d2(c.pos.x,c.pos.z,f.x,f.z)>140*140);
     if(rb.t>12&&far){for(const c of rb.cars)if(c!==player.car&&cars.includes(c))removeCar(c);roadblocks.splice(roadblocks.indexOf(rb),1);}}
   for(const c of cars.slice())if(c.police&&c.ai==='parked'&&c!==player.car&&!roadblocks.some(rb=>rb.cars.includes(c))&&d2(c.pos.x,c.pos.z,f.x,f.z)>150*150)removeCar(c);
-  for(const p of peds.slice())if(p.cop&&d2(p.pos.x,p.pos.z,f.x,f.z)>(p.state==='cop'?110*110:60*60))removePed(p);
+  // stray officers on foot are tidied away; officers sitting in a patrol car go when their car does
+  for(const p of peds.slice())if(p.cop&&p.state!=='seated'&&!p.inSeq&&d2(p.pos.x,p.pos.z,f.x,f.z)>(p.state==='cop'?110*110:60*60))removePed(p);
   if(act<want&&!player.dead){policeSpawnT-=dt;if(policeSpawnT<=0){policeSpawnT=2.2;spawnCarOnRoad({police:true,min:80,max:170});}}
   if(st===0)for(const c of cars.slice())if(c.ai==='police'&&d2(c.pos.x,c.pos.z,f.x,f.z)>130*130)removeCar(c);
   // traffic

@@ -35,10 +35,12 @@ COMMON = {
     'taillight': mat('taillight', srgb(0xc81818), .3, 0, srgb(0xff2020)),
     'indicator': mat('indicator', srgb(0xffa020), .3, 0, srgb(0xff9010)),
     'white': mat('white', srgb(0xf2f2f2), .45),
-    'lightRed': mat('lightRed', srgb(0xff2020), .3, 0, srgb(0xff2020)),
+    'lightRed': mat('lightRed', srgb(0x2050ff), .3, 0, srgb(0x2050ff)),   # UK: both halves of the bar are blue (name kept for the game)
     'lightBlue': mat('lightBlue', srgb(0x2050ff), .3, 0, srgb(0x2050ff)),
     'interior': mat('interior', srgb(0x2a2a2e), .9),
     'seat': mat('seat', srgb(0x4a3e36), .85),
+    'battB': mat('battB', srgb(0x1f48b8), .4),
+    'battY': mat('battY', srgb(0xd8e21a), .4, 0, srgb(0x6a7010)),
 }
 
 # ---------------- body loft ----------------
@@ -179,6 +181,32 @@ def car_common_details(parts, cfg):
     parts.append(box('plateF', (.5, .03, .12), (0, -(nf + .2), cfg.get('bump_z', .44)), COMMON['white']))
     parts.append(box('plateR', (.5, .03, .14), (0, -(tf - .2), cfg.get('bump_z', .44) + .02), COMMON['white']))
 
+def battenburg(cfg):
+    """returns {'body': [...], 'l'/'r'/'bl'/'br': [...]} of check squares (UK police livery)"""
+    out = {'body': []}; secs = [(2.02, .80, 'body'), (.80, -.30, ''), (-.36, -.92, 'b'), (-.92, -2.04, 'body')]
+    k0 = 0
+    for f0, f1, key in secs:
+        n = max(1, round((f0 - f1) / .4)); L = (f0 - f1) / n
+        for i in range(n):
+            fc = f0 - L * (i + .5)
+            for row, (z0, z1) in enumerate(((.62, .80), (.80, .98))):
+                if row == 0 and any(abs(fc - wf) < .52 for wf in cfg['wheels_f']): continue
+                for side, sgn in (('l', 1), ('r', -1)):
+                    m = COMMON['battB'] if (k0 + i + row) % 2 == 0 else COMMON['battY']
+                    b = box('chk', (.025, L - .005, z1 - z0), (sgn * 1.004, -fc, (z0 + z1) / 2), m)
+                    out.setdefault('body' if key == 'body' else key + side, []).append(b)
+        k0 += n
+    return out
+
+def police_text(parts):
+    """POLICE on the bonnet, reading for the driver in front looking in the mirror (reversed) is overkill: plain, facing up"""
+    try:
+        bpy.ops.object.text_add(location=(0, -1.55, 1.005)); t = bpy.context.object; t.data.body = 'POLICE'; t.data.size = .26; t.data.extrude = .004
+        t.data.align_x = 'CENTER'; t.data.align_y = 'CENTER'; t.rotation_euler = (0, 0, math.pi)
+        bpy.ops.object.convert(target='MESH'); t.data.materials.clear(); t.data.materials.append(COMMON['battB']); parts.append(t)
+    except Exception as e:
+        print('police text skipped', e)
+
 def build_car(cfg, x_off):
     pid = cfg['id']
     COMMON['paint_' + pid] = mat('paint_' + pid, srgb(cfg['color']), .35, .1)
@@ -188,17 +216,20 @@ def build_car(cfg, x_off):
     car_common_details(parts, cfg)
     interior(parts, cfg)
     if 'extra' in cfg: cfg['extra'](parts)
+    checks = battenburg(cfg) if cfg.get('checks') else {}
+    parts += checks.get('body', [])
     b = join(parts, pid + '_body')
     door_objs = list(cfg['rear_doors']()) if 'rear_doors' in cfg else []
     smooth(b)
     for (side, hinge_f), d in doors.items():
         sgn = 1 if side.endswith('l') else -1
+        extra_ = checks.get(side, [])
         if len(side) == 1:
             mm = COMMON['paint_' + pid] if cfg.get('mirror_paint') else COMMON['trim']
             mir = box('mir', (.16, .1, .12), (sgn * 1.07, -(hinge_f - .1), cfg['mirror_z']), mm)
-            d = join([d, mir], pid + '_door_' + side)
+            d = join([d, mir] + extra_, pid + '_door_' + side)
         else:
-            d.name = pid + '_door_' + side
+            d = join([d] + extra_, pid + '_door_' + side) if extra_ else d; d.name = pid + '_door_' + side
         bpy.context.scene.cursor.location = (sgn * 1.0, -hinge_f, 0)
         bpy.ops.object.select_all(action='DESELECT'); d.select_set(True); bpy.context.view_layer.objects.active = d
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
@@ -261,6 +292,7 @@ def police_band(zone, band):
 def police_extra(parts):
     parts.append(box('barbase', (1.3, .34, .1), (0, .45, 1.73), COMMON['trim']))
     parts.append(box('barR', (.58, .3, .14), (.33, .45, 1.83), COMMON['lightRed'], bevel=.03))
+    police_text(parts)
     parts.append(box('barB', (.58, .3, .14), (-.33, .45, 1.83), COMMON['lightBlue'], bevel=.03))
     parts.append(box('push', (1.5, .12, .5), (0, -2.42, .55), COMMON['trim']))
     for s in (-1, 1): parts.append(box('pushbar', (.1, .3, .5), (s * .6, -2.3, .55), COMMON['trim']))
@@ -326,8 +358,8 @@ CARS = [
          nose_f=2.26, nose_z=.6, tail_f=-2.26, tail_z=.86, mirror_f=.3, mirror_z=.95, bumper='trim', bump_z=.36, mirror_paint=True, extra=sports_extra, door=(.36, -1.0), inside=dict(seat_f=-.8, seat_z=.38, floor=.3, floor_f=-.75, len=1.9, dash_f=.15, dash_z=.74, wheel_f=-.14, wheel_z=.74)),
     dict(id='van', label='Van', color=0x2c5d8f, keys=VAN_KEYS, zones=VAN_ZONES, wheels_f=(1.4, -1.3), arch_z=.84, wheel_r=.4,
          nose_f=2.24, nose_z=.84, tail_f=-2.24, tail_z=1.0, mirror_f=1.35, mirror_z=1.24, extra=van_extra, door=(.92, .22), open_rear=True, rear_doors=van_rear_doors, tl=((.08, .06, .34), .94), inside=dict(seat_f=.42, seat_z=.74, floor=.46, floor_f=.7, len=1.4, dash_f=1.2, dash_z=1.12, wheel_f=.92, wheel_z=1.12, bulk=(.0, 1.6), cargo=(-.05, -2.16))),
-    dict(id='police', label='Police cruiser', color=0x121214, keys=SALOON_KEYS, zones=SALOON_ZONES, wheels_f=(1.38, -1.38), arch_z=.8, wheel_r=.38,
-         nose_f=2.22, nose_z=.78, tail_f=-2.22, tail_z=.86, mirror_f=.7, mirror_z=1.09, extra=police_extra, band=police_band, door=[(.80, -.30, ''), (-.36, -.92, 'b')], inside=dict(seat_f=-.32, seat_z=.5, floor=.4, floor_f=-.6, len=2.4, dash_f=.62, dash_z=.92, wheel_f=.36, wheel_z=.92, bench=True, bench_off=.72)),
+    dict(id='police', label='Police car', color=0xf4f4f4, checks=True, keys=SALOON_KEYS, zones=SALOON_ZONES, wheels_f=(1.38, -1.38), arch_z=.8, wheel_r=.38,
+         nose_f=2.22, nose_z=.78, tail_f=-2.22, tail_z=.86, mirror_f=.7, mirror_z=1.09, extra=police_extra, door=[(.80, -.30, ''), (-.36, -.92, 'b')], inside=dict(seat_f=-.32, seat_z=.5, floor=.4, floor_f=-.6, len=2.4, dash_f=.62, dash_z=.92, wheel_f=.36, wheel_z=.92, bench=True, bench_off=.72)),
 ]
 
 roots = {}
