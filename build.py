@@ -6,6 +6,9 @@ src = open(A('src', 'index.html')).read()
 data = {k: base64.b64encode(open(A('assets', 'cars', f'{k}.glb'), 'rb').read()).decode() for k in ['saloon', 'sports', 'van', 'police']}
 for k in ['male', 'female']: data['human_' + k] = base64.b64encode(open(A('assets', 'people', f'{k}.glb'), 'rb').read()).decode()
 assert '/*MODEL_DATA*/{}' in src and '/*ART_CSS*/' in src
+# the UK city generator lives in its own file so it can be previewed and tested in node
+assert '/*CITY_JS*/' in src
+src = src.replace('/*CITY_JS*/', open(A('src', 'city.js')).read())
 out = src.replace('/*MODEL_DATA*/{}', json.dumps(data))
 arts = ['chase', 'hero', 'street', 'dusk']
 css = ''.join(".art.a%d{background-image:url(data:image/jpeg;base64,%s)}" % (i + 1, base64.b64encode(open(A('assets', 'art', f'{a}.jpg'), 'rb').read()).decode()) for i, a in enumerate(arts))
