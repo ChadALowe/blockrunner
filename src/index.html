@@ -428,10 +428,21 @@ let SPRAY=null;
     const sign=new THREE.Mesh(new THREE.PlaneGeometry(10,1.9),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc)}));
     sign.rotation.y=Math.atan2(-vx,-vz);sign.position.set(fx-vx*.35,7.2,fz-vz*.35);scene.add(sign);
     SPRAY={x:gx+vx*.5,z:gz+vz*.5,cd:0,ang:Math.atan2(vx,vz)};}}
-// ---- the safehouse: a flat in the Grove Street tower block nearest the centre (door on the pavement)
-let HOMELOT=null,HOMEPT=null;
+// ---- the safehouse: a flat in the Grove Street tower block nearest the centre (door on the pavement),
+// with the lock-up garage on the free ground right beside it
+let HOMELOT=null,HOMEPT=null,HOMEDOFF=0,LOCKLOT=null,LOCKPT=null;
 {const T=CITY.lots.filter(l=>l.kind==='tower'&&l.front!==undefined&&!blocks[l.block].outer&&!l.skip).sort((a,b)=>Math.hypot(a.cx,a.cz)-Math.hypot(b.cx,b.cz));
-  const L=T[0];if(L){HOMELOT=L;const vx=Math.sin(L.ang),vz=Math.cos(L.ang);HOMEPT=[L.cx-vx*(L.d/2+2.6),L.cz-vz*(L.d/2+2.6)];}}
+  const H=T[0];if(H){HOMELOT=H;const vx=Math.sin(H.ang),vz=Math.cos(H.ang),ux=Math.cos(H.ang),uz=-Math.sin(H.ang);
+    // the neighbouring tower along the same street decides which side has room for the garage
+    const N=T.slice(1).filter(l=>Math.cos(l.ang-H.ang)>.7&&Math.abs((l.cx-H.cx)*vx+(l.cz-H.cz)*vz)<8).sort((a,b)=>Math.hypot(a.cx-H.cx,a.cz-H.cz)-Math.hypot(b.cx-H.cx,b.cz-H.cz))[0];
+    let side=1,room=16;if(N){const du=(N.cx-H.cx)*ux+(N.cz-H.cz)*uz;side=du<0?-1:1;room=Math.abs(du)-(H.w+N.w)/2;}
+    const gw=clamp(room-2.4,6,12.5),off=side*(H.w/2+1.2+gw/2);
+    LOCKLOT={ang:H.ang,d:H.d,cx:H.cx+ux*off,cz:H.cz+uz*off,w:gw+1.5};
+    LOCKPT=[LOCKLOT.cx-vx*(LOCKLOT.d/2+2),LOCKLOT.cz-vz*(LOCKLOT.d/2+2)];
+    HOMEDOFF=side*(H.w/2-3.4);   // the flat's door sits at the garage end of the facade
+    HOMEPT=[H.cx-vx*(H.d/2+2.6)+ux*HOMEDOFF,H.cz-vz*(H.d/2+2.6)+uz*HOMEDOFF];}}
+const onLockPlot=(x,z,m)=>{if(!LOCKLOT)return false;const L=LOCKLOT,vx=Math.sin(L.ang),vz=Math.cos(L.ang),ux=Math.cos(L.ang),uz=-Math.sin(L.ang),dx=x-L.cx,dz=z-L.cz;
+  return Math.abs(dx*ux+dz*uz)<L.w/2+m&&Math.abs(dx*vx+dz*vz)<L.d/2+m;};
 // ---- buildings
 for(const L of CITY.lots){if(L.skip)continue;addBlockBuilding(L);}
 finishChunks();
@@ -446,14 +457,14 @@ function addLamp(x,z,nx,nz){dummy.position.set(x,0,z);dummy.rotation.set(0,Math.
   lampP.push(dummy.matrix.clone());lampH.push(dummy.matrix.clone());addCol(x-.2,x+.2,z-.2,z+.2,7,true);}
 // walk loops run along the middle of the pavement; the outward side (towards the road) is to the right of the walking direction
 function walkOut(b,i){const W=b.walk,p=W[(i+W.length-1)%W.length],q=W[(i+1)%W.length],dx=q[0]-p[0],dz=q[1]-p[1],l=Math.hypot(dx,dz)||1;return b.outer?[-dz/l,dx/l]:[dz/l,-dx/l];}
-const nearHome=(x,z)=>HOMEPT&&Math.hypot(x-HOMEPT[0],z-HOMEPT[1])<6;
+const nearHome=(x,z)=>(HOMEPT&&Math.hypot(x-HOMEPT[0],z-HOMEPT[1])<6)||onLockPlot(x,z,5);
 blocks.forEach((b,k)=>{const W=b.walk;
   for(let i=k%5;i<W.length;i+=6){const o=walkOut(b,i);const x=W[i][0]+o[0]*1.15,z=W[i][1]+o[1]*1.15;if(CITY.crossings.some(X=>Math.hypot(X.x-x,X.z-z)<6)||nearHome(x,z))continue;addLamp(x,z,o[0],o[1]);}
   if(b.district==='estate'||b.district==='terrace')for(let i=(k*3)%7+3;i<W.length;i+=9){const o=walkOut(b,i);const tx=W[i][0]+o[0]*.9,tz=W[i][1]+o[1]*.9;if(nearHome(tx,tz))continue;addTree(tx,tz,.8);}});
 if(PARKB){for(let t=0;t<60;t++){const x=rr(PARKB.x0+8,PARKB.x1-8),z=rr(PARKB.z0+8,PARKB.z1-8);if(!CH.inside(PARKB.line,x,z)||CH.polyDist(PARKB.line,x,z,true)<4)continue;
   if(Math.hypot((x-PARKB.cx-10)/26,(z-PARKB.cz+30)/16)<1.1)continue;addTree(x,z,rr(1,1.4));}}
 for(const b of blocks)if(b.district==='estate')for(let t=0;t<10;t++){const x=rr(b.x0+10,b.x1-10),z=rr(b.z0+10,b.z1-10);if(!CH.inside(b.line,x,z)||CH.polyDist(b.line,x,z,true)<5)continue;
-  if(colNear(x-5,x+5,z-5,z+5).some(o=>!o.small&&colInside(o,x,z,3)))continue;addTree(x,z,rr(.9,1.2));}
+  if(onLockPlot(x,z,4)||colNear(x-5,x+5,z-5,z+5).some(o=>!o.small&&colInside(o,x,z,3)))continue;addTree(x,z,rr(.9,1.2));}
 // roundabout islands: a low kerb with a tree
 for(const k in CITY.nodes){const n=CITY.nodes[k];if(!n.rb)continue;const r=n.rb*.72;addColBox(n.x,n.z,r*2,r*2,0,.35,true);addTree(n.x,n.z,1.1);
   const m=new THREE.Mesh(new THREE.CylinderGeometry(n.rb,n.rb+.2,.3,28),lam(0x5f9a45));m.position.set(n.x,.15,n.z);m.receiveShadow=true;scene.add(m);}
@@ -484,6 +495,7 @@ function roadSide(E,f,side,out){const L=E.pts;let acc=0,at=E.len*f;for(let i=1;i
 // keep furniture clear of shop doors, crossings and each other
 const SHOPDOORS=CITY.lots.filter(l=>l.kind==='shop').map(l=>[l.cx-Math.sin(l.ang)*(l.d/2+2),l.cz-Math.cos(l.ang)*(l.d/2+2)]);
 if(HOMEPT)SHOPDOORS.push(HOMEPT);
+if(LOCKPT)SHOPDOORS.push(LOCKPT);
 const FURN=[];const furnClear=(x,z,r)=>!SHOPDOORS.some(d=>Math.hypot(d[0]-x,d[1]-z)<4.5)&&!CITY.crossings.some(X=>Math.hypot(X.x-x,X.z-z)<6)&&!FURN.some(f=>Math.hypot(f.x-x,f.z-z)<r);
 // Belisha beacons at every zebra crossing
 const BELISHA=[];
@@ -1729,6 +1741,7 @@ function drawMini(){
   mctx.moveTo(f.x+ax*6,f.z+az*6);mctx.lineTo(f.x-ax*4+bx*4,f.z-az*4+bz*4);mctx.lineTo(f.x-ax*2,f.z-az*2);mctx.lineTo(f.x-ax*4-bx*4,f.z-az*4-bz*4);mctx.closePath();mctx.fill();mctx.stroke();
   mctx.restore();
   if(SPRAY)miniIcon(SPRAY.x,SPRAY.z,'#ff7fc0','S',7,84);
+  if(LOCK)miniIcon(LOCK.g.x,LOCK.g.z,'#ffb04a','L',7,84);
   for(const S of SHOPS)miniIcon(S.x,S.z,{barber:'#6aa8ff',clothes:'#4fd07a',guns:'#ff5a4a',home:'#4fd2ff'}[S.type],{barber:'B',clothes:'C',guns:'G',home:'\u2302'}[S.type],7,84);
   if(!mission)for(const d of MDEFS)miniIcon(d.x,d.z,'#ffd23f',d.letter,7,84);
   if(ATTACK){const b=blocks[ATTACK.bi];miniIcon(b.cx,b.cz,'#ff3030','!',7,84);}
@@ -1767,6 +1780,7 @@ function populate(){
   for(let k=0;k<12;k++)spawnCarOnRoad({parked:true,min:15});
   for(let k=0;k<TRAFFIC;k++)spawnCarOnRoad({min:25});
   for(let k=0;k<PED_COUNT;k++)spawnPed({});
+  restoreLockup();
 }
 
 function manage(dt){
@@ -1799,7 +1813,7 @@ function manage(dt){
   for(const p of peds.slice())if(p.state==='dead'&&p.deadT>30&&d2(p.pos.x,p.pos.z,f.x,f.z)>50*50)removePed(p);
   if(peds.filter(p=>p.state!=='dead'&&!p.cop&&p.gang===undefined&&p.state!=='seated').length<PED_COUNT)spawnPed({far:true});
   stealT-=dt;if(stealT<=0){stealT=3;const w=peds.filter(p=>p.state==='walk'&&!p.cop&&!p.inSeq&&p.h.g.visible);const p=w.length?pick(w):null;
-    if(p&&Math.random()<.35){const pc=cars.find(c=>c.ai==='parked'&&!c.police&&!c.burnt&&!c.occ.d&&!carBusy(c)&&c!==player.car&&!(c.playerUsed&&now-c.playerUsed<40)&&!(mission&&mission.data&&mission.data.car===c)&&d2(c.pos.x,c.pos.z,p.pos.x,p.pos.z)<10*10);
+    if(p&&Math.random()<.35){const pc=cars.find(c=>c.ai==='parked'&&!c.police&&!c.burnt&&!c.occ.d&&!carBusy(c)&&c!==player.car&&!c.keep&&!(c.playerUsed&&now-c.playerUsed<40)&&!(mission&&mission.data&&mission.data.car===c)&&d2(c.pos.x,c.pos.z,p.pos.x,p.pos.z)<10*10);
       if(pc)startSeq('enter',p,pc,'r',{onDone:()=>{pc.ai='traffic';pc.cruise=rf(9,13);resyncNav(pc);}});}}
   parkT-=dt;if(parkT<=0){parkT=4;if(cars.filter(c=>c.ai==='parked'&&!c.police&&!c.burnt).length<10)spawnCarOnRoad({parked:true,min:90,max:230});
     if(cars.length>40){let far=null,fd=0;for(const c of cars){if(c===player.car||c.police||c.keep||carBusy(c)||(mission&&mission.data&&mission.data.car===c))continue;const q=d2(c.pos.x,c.pos.z,f.x,f.z);if(q>fd){fd=q;far=c;}}if(far&&fd>150*150)removeCar(far);}}
@@ -1837,7 +1851,7 @@ function update(dt){
   for(const c of cars)carHits(c);
   for(const p of peds){updatePed(p,dt);const f=focus();p.h.g.visible=d2(p.pos.x,p.pos.z,f.x,f.z)<CULL*CULL*.45;}
   manage(dt);
-  updateHeli(dt);updatePickups(dt);updateSpray(dt);updateMission(dt);updateShops(dt);
+  updateHeli(dt);updatePickups(dt);updateSpray(dt);updateMission(dt);updateShops(dt);updateLockup(dt);
   if(noteT>0){noteT-=dt;if(noteT<=0)noteEl.style.display='none';}
   if(bigHideAt&&now>bigHideAt)hideBig();
   updateParts(dt);updateProjs(dt);
@@ -2631,15 +2645,15 @@ function insideUpdate(dt){
 // ======================================================================
 const HOME_KEY='blockrunner_home';
 let HOMEDATA={saved:false,at:0,outfits:[],garage:[]};
-try{const o=JSON.parse(localStorage.getItem(HOME_KEY));if(o&&typeof o==='object'){HOMEDATA.saved=!!o.saved;HOMEDATA.at=+o.at||0;if(Array.isArray(o.outfits))HOMEDATA.outfits=o.outfits.slice(0,6);if(Array.isArray(o.garage))HOMEDATA.garage=o.garage.slice(0,4);}}catch(e){}
+try{const o=JSON.parse(localStorage.getItem(HOME_KEY));if(o&&typeof o==='object'){HOMEDATA.saved=!!o.saved;HOMEDATA.at=+o.at||0;if(Array.isArray(o.outfits))HOMEDATA.outfits=o.outfits.slice(0,6);if(Array.isArray(o.garage))HOMEDATA.garage=o.garage.slice(0,6);}}catch(e){}
 function homeSave(){try{localStorage.setItem(HOME_KEY,JSON.stringify(HOMEDATA));}catch(e){}}
 const HX=-720,HZ=-780,HW=9,HD=7,HH=3.2;
-const GARAGE_SLOTS=4,OUTFIT_SLOTS=6;
+const GARAGE_SLOTS=6,OUTFIT_SLOTS=6;
 let HOMES=null,HOMEROOM=null;
 function placeHome(){
   const L=HOMELOT;if(!L)return;
   const a=L.ang,vx=Math.sin(a),vz=Math.cos(a),ux=Math.cos(a),uz=-Math.sin(a);
-  const fx=L.cx-vx*L.d/2,fz=L.cz-vz*L.d/2,face=Math.atan2(-vx,-vz);
+  const fx=L.cx-vx*L.d/2+ux*HOMEDOFF,fz=L.cz-vz*L.d/2+uz*HOMEDOFF,face=Math.atan2(-vx,-vz);
   const at=(o,along,up,obj)=>{obj.position.set(fx-vx*o+ux*along,up,fz-vz*o+uz*along);obj.rotation.y=face;scene.add(obj);return obj;};
   const frame=new THREE.Mesh(boxG,lam(0xa9a79f));frame.scale.set(2.2,2.9,.2);at(.06,0,1.45,frame);
   const door=new THREE.Mesh(boxG,lam(0x1f6b66));door.scale.set(1.7,2.55,.25);at(.12,0,1.28,door);
@@ -2665,8 +2679,7 @@ function homeOutside(){const S=HOMES;return S?{x:S.x+Math.sin(S.face)*2.2,z:S.z+
 const HBOX=[[-4.5,-3.45,-1.7,.9],[-4.5,-3.75,1.6,3.5],[2.35,4.5,1.3,3.5],[3.95,4.5,-1.25,.45],[-2.65,-1.75,-1.0,.15],[-4.5,-3.95,-3.5,-2.95]];
 const HSPOTS=[
   {id:'bed',x:1.6,z:2.35,r:1.35,face:Math.PI,label:'to save or sleep',act:()=>bedMenu()},
-  {id:'wardrobe',x:-3.0,z:2.5,r:1.2,face:Math.PI/2,label:'to change clothes',act:()=>wardrobeMenu()},
-  {id:'keys',x:1.9,z:-2.6,r:1.0,face:0,label:'for the lock-up keys',act:()=>keysMenu()}];
+  {id:'wardrobe',x:-3.0,z:2.5,r:1.2,face:Math.PI/2,label:'to change clothes',act:()=>wardrobeMenu()}];
 function buildHomeRoom(){if(HOMEROOM)return;const g=new THREE.Group();g.position.set(HX,0,HZ);scene.add(g);HOMEROOM=g;
   const tex=(w,h,f,rx,ry)=>{const c=document.createElement('canvas');c.width=w;c.height=h;f(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx||1,ry||1);return t;};
   const L=(o)=>new THREE.MeshLambertMaterial(o);
@@ -2707,7 +2720,6 @@ function buildHomeRoom(){if(HOMEROOM)return;const g=new THREE.Group();g.position
   bx(.06,.3,.05,-3.7,1.1,2.52,0xd9c36a,.6);bx(.06,.3,.05,-3.7,1.1,2.60,0xd9c36a,.6);
   // keys board by the door (south wall) with a hook of keys
   bx(.7,.5,.05,1.9,1.55,-HD/2+.1,0x5a3a1a,.4);for(const x of[1.72,1.9,2.08]){bx(.04,.13,.04,x,1.45,-HD/2+.14,0xd9d9d9,.7);bx(.05,.05,.02,x,1.36,-HD/2+.14,0xd9c36a,.8);}
-  const kl=new THREE.Mesh(new THREE.PlaneGeometry(.6,.14),new THREE.MeshBasicMaterial({map:signTex('LOCK-UP','#5a3a1a','#ffd23f')}));kl.position.set(1.9,1.82,-HD/2+.14);g.add(kl);
   // poster, plant, shoes
   const po=new THREE.Mesh(new THREE.PlaneGeometry(1.1,.7),new THREE.MeshBasicMaterial({map:signTex('GROVE ST','#10351d','#ffd23f')}));po.position.set(-1.2,1.9,HD/2-.05);po.rotation.y=Math.PI;g.add(po);
   bx(.3,.3,.3,-4.25,.15,-3.25,0x9a4a2a,.35);const pb=new THREE.Mesh(new THREE.SphereGeometry(.38,10,8),L({color:0x3f8f4a,emissive:0x3f8f4a,emissiveIntensity:.3}));pb.position.set(-4.25,.7,-3.25);g.add(pb);
@@ -2719,7 +2731,7 @@ function enterHome(S){
   buildHomeRoom();INSIDE=S;ROOMC={x:HX,z:HZ,w:HW,d:HD,h:HH};inLight.intensity=.55;inLight.position.set(HX+2,HH+3,HZ-4);inLight.target.position.set(HX,1,HZ+1);
   player.pos.set(HX,0,HZ-HD/2+1.3);player.vel.set(0,0,0);player.knock.set(0,0,0);player.facing=0;camYaw=0;camPitch=.12;camDistS=3;
   player.human.g.position.copy(player.pos);miniEl.style.visibility='hidden';thump(160,.15,.3);if(player.human.gunM)player.human.gunM.visible=false;
-  note('<b>Flat 14</b> — the bed saves, the wardrobe changes your clothes, the hook by the door has your lock-up keys.',5);}
+  note('<b>Flat 14</b> — the bed saves, the wardrobe changes your clothes. Your <b>lock-up</b> is the garage along the road.',5);}
 function leaveHome(){const S=INSIDE;if(player.human.gunM)player.human.gunM.visible=true;INSIDE=null;inLight.intensity=0;S.armed=false;ROOMC={x:IX,z:IZ,w:RW,d:RD,h:RH};
   player.pos.set(S.x+Math.sin(S.face)*2.2,0,S.z+Math.cos(S.face)*2.2);player.facing=S.face;camYaw=S.face;camPitch=.18;camDistS=3;miniEl.style.visibility='';thump(160,.15,.3);}
 function homeUpdate(dt){
@@ -2805,33 +2817,55 @@ function wardrobeMenu(){
     del:HOMEDATA.outfits.length>1?()=>{HOMEDATA.outfits.splice(i,1);homeSave();const s=LM.sel;wardrobeMenu();LM.sel=Math.min(s,LM.rows.length-1);lmRender();lmSelect();blip(400);}:null}));
   lmOpen({title:'Wardrobe',face:Math.PI/2,sub:'Buy new clothes at Threads and they land here. '+HOMEDATA.outfits.length+'/'+OUTFIT_SLOTS+' outfits',rows,sel:Math.max(0,HOMEDATA.outfits.findIndex(o=>sameLook(o,cur)))});}
 
-// ---- lock-up keys: park the car you drove here, bring one round
-function hexName(c){const r=(c>>16&255)/255,g=(c>>8&255)/255,b=(c&255)/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,d=mx-mn;
-  if(l<.14)return'Black';if(l>.86)return'White';if(d<.1)return l<.45?'Dark grey':'Silver';
-  let h=d?(mx===r?((g-b)/d+6)%6:mx===g?(b-r)/d+2:(r-g)/d+4)*60:0;
-  if(l<.3&&h>10&&h<50)return'Brown';return h<15||h>=345?'Red':h<40?'Orange':h<70?'Yellow':h<165?'Green':h<255?'Blue':h<300?'Purple':'Pink';}
+// ---- the lock-up: a garage on the next plot along the road. The roller door opens as you approach; any car you leave inside is saved.
 const CAR_NAME={saloon:'Saloon',sports:'Sports coupe',van:'Van'};
-function carToStore(){if(!HOMES)return null;let best=null;
-  for(const c of cars){if(c.burnt||c.police||c===player.car||!c.playerUsed||now-c.playerUsed>600||!CAR_NAME[c.type])continue;
-    if(Object.values(c.occ).some(Boolean)||d2(c.pos.x,c.pos.z,HOMES.x,HOMES.z)>45*45)continue;if(!best||c.playerUsed>best.playerUsed)best=c;}
-  return best;}
-function keysMenu(){
-  const rows=[],c=carToStore(),full=HOMEDATA.garage.length>=GARAGE_SLOTS;
-  if(c)rows.push({t:'Park '+hexName(c.m.paint.color.getHex())+' '+CAR_NAME[c.type],d:full?'lock-up is full':'into the lock-up',dim:full,act:()=>{storeCar(c);}});
-  else rows.push({t:'Park a car',d:'drive it near the flat first',dim:true});
-  HOMEDATA.garage.forEach((g,i)=>rows.push({t:hexName(g.col)+' '+(CAR_NAME[g.type]||'Car'),d:'bring it round'+(g.hp<g.maxHp*.6?' · damaged':''),act:()=>fetchCar(i)}));
-  lmOpen({title:'Lock-up',face:0,sub:HOMEDATA.garage.length+'/'+GARAGE_SLOTS+' cars stored',rows});}
-function storeCar(c){
-  if(HOMEDATA.garage.length>=GARAGE_SLOTS){blip(300);return;}
-  HOMEDATA.garage.push({type:c.type,col:c.m.paint.color.getHex(),hp:Math.max(20,Math.round(c.hp)),maxHp:c.maxHp||c.hp});homeSave();removeCar(c);
-  lmClose(true);ding(660,990);thump(120,.2,.4);note('Car locked away in your <b>lock-up</b>.',3.5);}
-function fetchCar(i){
-  const g=HOMEDATA.garage[i];if(!g)return;const sp=roadNear(HOMES.x,HOMES.z);
-  if(!sp){note('No room at the kerb outside. Try again in a moment.',3);blip(300);return;}
-  const c=makeCar(sp.x,sp.z,sp.h,'parked',false,g.type);c.nav={E:sp.E,dir:sp.dir,s:sp.s,path:null,pi:0,node:null,wait:0};
-  c.m.paint.color.setHex(g.col);if(c.m.paint2!==c.m.paint)c.m.paint2.color.setHex(g.col);c.hp=g.hp;c.maxHp=g.maxHp;c.keep=true;c.playerUsed=now;
-  HOMEDATA.garage.splice(i,1);homeSave();lmClose(true);ding(660,990);note('Your <b>'+hexName(g.col).toLowerCase()+' '+(CAR_NAME[g.type]||'car').toLowerCase()+'</b> is waiting outside.',4);}
-
+let LOCK=null,lockT=0,lockReady=false;
+function buildLockup(){
+  const Lt=LOCKLOT;if(!Lt)return;
+  const a=Lt.ang,vx=Math.sin(a),vz=Math.cos(a),ux=Math.cos(a),uz=-Math.sin(a),gw=Math.min(Lt.w-1.5,14.4),gd=8.5,H=3.4;
+  const fx=Lt.cx-vx*Lt.d/2,fz=Lt.cz-vz*Lt.d/2,gx=fx+vx*gd/2,gz=fz+vz*gd/2;
+  const wall=lam(0x8d8b86),roof=lam(0x6a6864),slab=lam(0x77767a);
+  const box=(cx,cz,w,d,h,y,m,col)=>{const o=new THREE.Mesh(boxG,m);o.scale.set(w,h,d);o.position.set(cx,y,cz);o.rotation.y=a;o.castShadow=o.receiveShadow=true;scene.add(o);return col?addColBox(cx,cz,w,d,a,col):o;};
+  box(gx+vx*gd/2,gz+vz*gd/2,gw+.6,.6,H,H/2,wall,H);
+  for(const sg of[-1,1])box(gx+ux*gw/2*sg,gz+uz*gw/2*sg,.6,gd,H,H/2,wall,H);
+  box(gx,gz,gw+.6,gd+.6,.4,H+.2,roof);
+  box(fx+vx*.3,fz+vz*.3,gw+.6,.6,1.0,H+.5,wall);
+  box(gx,gz,gw,gd,.06,.03,slab);
+  const sg=new THREE.Mesh(new THREE.PlaneGeometry(Math.min(gw*.6,7),.8),new THREE.MeshBasicMaterial({map:signTex('LOCK-UPS','#1c2a1e','#ffd23f')}));
+  sg.position.set(fx-vx*.04,H+.55,fz-vz*.04);sg.rotation.y=Math.atan2(-vx,-vz);scene.add(sg);
+  const dc=document.createElement('canvas');dc.width=64;dc.height=64;{const g=dc.getContext('2d');g.fillStyle='#2f6a45';g.fillRect(0,0,64,64);for(let y=0;y<64;y+=8){g.fillStyle='#3a8056';g.fillRect(0,y,64,5);g.fillStyle='#1f4a30';g.fillRect(0,y+5,64,3);}}
+  const dt=new THREE.CanvasTexture(dc);dt.wrapS=dt.wrapT=THREE.RepeatWrapping;dt.repeat.set(1,4);
+  const door=new THREE.Mesh(boxG,new THREE.MeshLambertMaterial({map:dt}));door.scale.set(gw-.1,3.3,.14);door.position.set(fx+vx*.45,1.65,fz+vz*.45);door.rotation.y=a;door.castShadow=true;scene.add(door);
+  const col=addColBox(fx+vx*.45,fz+vz*.45,gw,.4,a,H);col.o=[col.x0,col.x1,col.z0,col.z1];
+  mg.fillStyle='#6f6e72';path(CH.obb(gx,gz,gw+.6,gd+.6,a),true);mg.fill();
+  LOCK={g:{x:gx,z:gz},f:{x:fx,z:fz},a,vx,vz,ux,uz,gw,gd,H,door,col,open:0,noted:false};}
+buildLockup();
+function lockInside(x,z,m){const L=LOCK;m=m||0;const dx=x-L.g.x,dz=z-L.g.z,u=dx*L.ux+dz*L.uz,v=dx*L.vx+dz*L.vz;return Math.abs(u)<L.gw/2-.2+m&&v>-.2-m&&v<L.gd-.1+m;}
+function updateLockup(dt){
+  const L=LOCK;if(!L)return;const f=focus(),d=Math.hypot(f.x-L.f.x,f.z-L.f.z),inside=lockInside(f.x,f.z,0);
+  const reach=player.car?Math.min(34,Math.abs(player.car.F)*1.1):0;
+  let want=L.open>0?(d<26+reach||inside):d<16+reach;
+  if(stars()>0&&!inside&&!lockInside(f.x,f.z,2.5))want=false;
+  // never shut the door on anything standing or rolling through the doorway
+  if(!want&&(lockInside(f.x,f.z,2.5)||cars.some(c=>{const dx=c.pos.x-L.f.x,dz=c.pos.z-L.f.z,u=dx*L.ux+dz*L.uz,v=dx*L.vx+dz*L.vz;return Math.abs(u)<L.gw/2&&v>-3.4&&v<2.8;})))want=true;
+  L.open=clamp(L.open+(want?1:-1)*dt*1.2,0,1);
+  const h=3.3*(1-L.open*.94);L.door.scale.y=h;L.door.position.y=L.H-h/2;
+  const shut=L.open<.85,o=L.col;o.small=!shut;if(shut){o.x0=o.o[0];o.x1=o.o[1];o.z0=o.o[2];o.z1=o.o[3];}else{o.x0=o.x1=o.z0=o.z1=1e9;}
+  if(player.car&&inside&&!L.noted){L.noted=true;note('Leave a car in the <b>lock-up</b> and it stays saved for next time.',5);}
+  // keep a snapshot of the cars inside; they are protected from clean-up and survive a reload
+  lockT-=dt;if(lockT>0||!lockReady)return;lockT=1.5;
+  const base=Math.atan2(L.vx,L.vz),out=[];
+  for(const c of cars){const ins=!c.burnt&&lockInside(c.pos.x,c.pos.z,0);c.keep=!!ins&&!c.police;
+    if(!ins||c.police||c===player.car||!CAR_NAME[c.type]||Object.values(c.occ).some(Boolean))continue;
+    const dx=c.pos.x-L.g.x,dz=c.pos.z-L.g.z;
+    out.push({type:c.type,col:c.m.paint.color.getHex(),hp:Math.max(20,Math.round(c.hp)),maxHp:Math.round(c.maxHp||c.hp),u:+(dx*L.ux+dz*L.uz).toFixed(2),v:+(dx*L.vx+dz*L.vz).toFixed(2),rh:+Math.atan2(Math.sin(c.h-base),Math.cos(c.h-base)).toFixed(2)});}
+  const snap=out.slice(0,GARAGE_SLOTS);if(JSON.stringify(snap)!==JSON.stringify(HOMEDATA.garage)){HOMEDATA.garage=snap;homeSave();}}
+function restoreLockup(){const L=LOCK;if(!L){return;}const base=Math.atan2(L.vx,L.vz);
+  HOMEDATA.garage.forEach((g,i)=>{if(!CAR_NAME[g.type])return;let u=g.u,v=g.v,rh=g.rh;
+    if(u===undefined||v===undefined){u=-L.gw/2+(i%4+.5)*(L.gw/4);v=L.gd*(i<4?.62:.3);rh=Math.PI;}
+    const x=L.g.x+L.ux*u+L.vx*v,z=L.g.z+L.uz*u+L.vz*v,c=makeCar(x,z,base+rh,'parked',false,g.type);
+    c.m.paint.color.setHex(g.col);if(c.m.paint2!==c.m.paint)c.m.paint2.color.setHex(g.col);c.hp=g.hp;c.maxHp=g.maxHp||g.hp;c.keep=true;});
+  lockReady=true;lockT=1.5;}
 function openCounter(){
   state='gunshop';started=false;hudEl.style.display='none';document.body.classList.remove('ingame');
   for(const k in keys)keys[k]=false;mouse.left=mouse.right=false;T.fire=T.jump=false;T.jx=T.jy=T.mag=0;

@@ -138,3 +138,6 @@ After every change that works, commit and push to `main` on `ChadALowe/blockrunn
 - **Lock-up keys** (`keysMenu`): park the last car you drove within 45 m of the door (not police cars), up to 4 stored; bring one round and it appears at the nearest free kerb (`roadNear`) flagged `c.keep` so the cleanup never deletes it. Stored data is type, colour, hp.
 - All of it lives in `localStorage['blockrunner_home']` as `{saved,at,outfits[],garage[]}`. Old saves have no key and behave as before.
 - `lmOpen/lmClose/lmRender` are a small reusable list menu (state `'list'`) that borrows the shop panel; rows can have `act`, `onSel` (live preview) and `del`.
+
+## Lock-up (update)
+The garage is a physical lock-up on the free ground right beside the flat tower (`LOCKLOT`, computed from `HOMELOT`'s neighbour gap; width 6-12.5 m). Green roller door opens as you approach, closes when you leave or get wanted. Cars inside are auto-saved to `HOMEDATA.garage` (`c.keep=true`), restored by `restoreLockup()`. The old key hook/menu is gone. The flat door is offset toward the garage (`HOMEDOFF`). Tests: `br/test/lock.js`, `layout.js`.
