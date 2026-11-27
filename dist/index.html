@@ -1537,7 +1537,7 @@ function updatePed(p,dt){
   if(cq>50*50&&!p.cop&&p.gang===undefined){p.lodAcc=(p.lodAcc||0)+dt;if(p.lodAcc<(cq>90*90?.15:.08))return;h.mixer.update(p.lodAcc);p.lodAcc=0;}
   else h.mixer.update(dt);
   if(p.gang===undefined&&!p.cop&&(p.act||p.pose||p.state==='walk'))lifePose(p,dt);
-  if(p.cop&&p.aim)aimArms(h,.05,false);
+  if(p.cop)copPose(p,dt);
   if(p.gang!==undefined)gangPose(p,dt);
 }
 function hasLOS(a,b){const d=b.clone().sub(a);const L=d.length();if(L<.01)return true;d.divideScalar(L);
@@ -1568,25 +1568,61 @@ function updateRage(p,dt){
   const sp=pc&&Math.abs(pc.F)>8?2.5:4.8;
   p.pos.x+=dx/d*sp*dt;p.pos.z+=dz/d*sp*dt;resolveCircle(p.pos,.35);
   return sp;}
+// UK police kit: nightstick at 1 star, taser at 2, armed response (pistols) from 3
+const COPKIT=['','stick','stick','taser','gun','gun'];
+let armedNoted=false,taseReadyT=0;
+function copKitFor(st){return st>=3?'gun':st===2?'taser':'stick';}
+function copEquip(p,kit){p.kit=kit;p.swingT=0;p.taseWind=0;equipModel(p.h,kit==='gun'?'pistol':kit==='taser'?'taser':'nightstick');}
+function copPose(p,dt){
+  if(p.state!=='cop'||p.inSeq||!p.kit)return;const h=p.h,f=focus();
+  if(d2(p.pos.x,p.pos.z,f.x,f.z)>60*60)return;
+  const G=p.kit==='gun'?GBY.pistol:p.kit==='taser'?GBY.taser:GBY.nightstick;
+  if(p.swingT>0){p.swingT-=dt;swingArms(h,clamp(1-p.swingT/p.swingD,0,1),G);h.g.updateMatrixWorld(true);alignGunToForearm(h);return;}
+  holdWeapon(h,p.aim,G,p.aimPitch||0);}
+function taserZap(p){
+  p.h.g.updateMatrixWorld(true);const from=p.h.muzzle?p.h.muzzle.getWorldPosition(new V3()):new V3(p.pos.x,1.4,p.pos.z);
+  const tgt=playerTarget(),hit=!player.dead&&!player.car&&Math.random()<clamp(.9-Math.hypot(tgt.x-from.x,tgt.z-from.z)/18,.35,.85);
+  const end=tgt.clone();if(!hit){end.x+=rf(-1.2,1.2);end.z+=rf(-1.2,1.2);end.y+=rf(-.5,.5);}
+  const g=new THREE.BufferGeometry().setFromPoints([from,end]);const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x9fd0ff,transparent:true}));scene.add(l);tracers.push({l,life:.22});
+  noise(.22,5000,volAt(from.x,from.z,.5));thump(1500,.12,volAt(from.x,from.z,.2));
+  if(hit){player.stun=1.7;player.vy=Math.max(player.vy,1.5);player.knock.set(0,0,0);player.lastHurt=now;hurtPlayer(5,'WASTED');sparks(end,0x9fd0ff);shake=Math.max(shake,.35);
+    note('<b style="color:#9fd0ff">TASERED!</b> You\'re stunned.',2.5);taseReadyT=now+4+Math.random()*2+player.stun;}
+  else taseReadyT=now+1.5;}
 function updateCop(p,dt){
   p.aim=false;
   const st=stars();
-  if(st===0||player.dead){p.idleT+=dt;if(p.idleT>1.5)toWalk(p);return 0;}
+  if(st===0||player.dead){armedNoted=false;p.idleT+=dt;if(p.idleT>1.5)toWalk(p);return 0;}
   p.idleT=0;
+  const kit=copKitFor(st);if(p.kit!==kit)copEquip(p,kit);
+  if(kit==='gun'&&!armedNoted){armedNoted=true;note('<b style="color:#ff6a5a">Armed response</b> has been authorised.',4);}
   const pc=player.car;
   if(pc&&!player.inSeq&&Math.abs(pc.F)<1.5&&!pc.sq.r){const dp=doorPoint(pc,'r'),wp=aroundCar(pc,p.pos.x,p.pos.z,dp.x,dp.z),ed=Math.hypot(dp.x-p.pos.x,dp.z-p.pos.z),ex=wp.x-p.pos.x,ez=wp.z-p.pos.z,wd=Math.hypot(ex,ez)||1e-6;
     if(ed<1.3&&wp.direct){startSeq('jack',p,pc,'r');return 0;}
     if(ed<16){p.facing=lerpAng(p.facing,Math.atan2(ex,ez),dt*10);p.pos.x+=ex/wd*p.speed*dt;p.pos.z+=ez/wd*p.speed*dt;resolveCircle(p.pos,.35);return p.speed;}}
   const f=focus(),dx=f.x-p.pos.x,dz=f.z-p.pos.z,d=Math.hypot(dx,dz)||1;
   p.facing=lerpAng(p.facing,Math.atan2(dx,dz),dt*8);
+  p.swingCD=(p.swingCD||0)-dt;
   let move=0;
-  if(st>=3){
+  if(kit==='gun'){
     p.h.g.updateMatrixWorld(true);const eye=new V3(p.pos.x,1.5,p.pos.z);
     const los=d<48&&hasLOS(eye,playerTarget());
     if(d>20||!los)move=p.speed;
-    else{p.aim=true;p.shootT-=dt;if(p.shootT<=0){p.shootT=rf(.8,1.5);p.h.g.updateMatrixWorld(true);npcShoot(p.h.muzzle?p.h.muzzle.getWorldPosition(new V3()):new V3(p.pos.x,1.4,p.pos.z),.78,7);}}
-  }else if(d>1.3)move=p.speed;
-  if(move){p.pos.x+=dx/d*move*dt;p.pos.z+=dz/d*move*dt;resolveCircle(p.pos,.35);}
+    else{p.aim=true;p.aimPitch=clamp(-Math.atan2(playerTarget().y-1.4,d),-.6,.6);p.shootT-=dt;if(p.shootT<=0){p.shootT=st>=4?rf(.5,1):rf(.8,1.5);p.h.g.updateMatrixWorld(true);npcShoot(p.h.muzzle?p.h.muzzle.getWorldPosition(new V3()):new V3(p.pos.x,1.4,p.pos.z),.78,7);}}
+    return move?(p.pos.x+=dx/d*move*dt,p.pos.z+=dz/d*move*dt,resolveCircle(p.pos,.35),move):0;}
+  // on-foot officers with a nightstick or a taser
+  if(kit==='taser'&&!player.car&&d>2.6&&d<9&&player.stun<=0&&now>taseReadyT){
+    p.h.g.updateMatrixWorld(true);const los=hasLOS(new V3(p.pos.x,1.5,p.pos.z),playerTarget());
+    if(los){p.aim=true;p.aimPitch=0;p.taseWind=(p.taseWind||0)+dt;
+      if(p.taseWind>.7){p.taseWind=0;taserZap(p);}
+      return 0;}}
+  else p.taseWind=0;
+  if(d<1.7){
+    if(p.swingCD<=0&&!player.car){p.swingCD=rf(1,1.5);p.swingT=p.swingD=.38;
+      if(kit==='stick'||kit==='taser'){thump(150,.07,volAt(p.pos.x,p.pos.z,.3));
+        if(!player.dead){player.knock.set(dx/d*2.5,0,dz/d*2.5);hurtPlayer(kit==='stick'?5:3);player.lastHurt=now;}}}
+    return 0;}
+  move=p.speed;
+  p.pos.x+=dx/d*move*dt;p.pos.z+=dz/d*move*dt;resolveCircle(p.pos,.35);
   return move;}
 function carVisual(c,dt){
   const g=c.m.g;
@@ -2290,6 +2326,7 @@ const GUNS=[
   GN('teargas','Tear Gas','thrown',200,{rate:.8,proj:'throw',th:'gas',pack:5,ammoPrice:150,short:'TEAR GAS'}),
   GN('sticky','Sticky Bombs','thrown',800,{rate:.7,proj:'throw',th:'sticky',pack:5,ammoPrice:600,short:'STICKY BOMBS'})];
 const GBY={};for(const g of GUNS)GBY[g.id]=g;
+GBY.taser=GN('taser','Taser','pistol',0,{short:'TASER'}); // police only, not sold
 GBY.fists=GN('fists','Fists','fists',0,{dmg:12,rate:.36,range:1.4,short:'FISTS'});
 const ARMOUR_PRICE=250;
 const isFirearm=G=>!(G.cat==='fists'||G.cat==='melee'||G.cat==='thrown');
@@ -2364,6 +2401,7 @@ const GDEF={
   knuckles:b=>{b.box(.03,.022,.11,0,0,0,'chr');for(let k=0;k<4;k++)b.tor(.014,.005,0,.024,-.045+k*.03,'chr',0,Math.PI/2,0);return[0,.06];},
   bat:b=>{b.cyl(.017,.14,0,0,0,'lth');b.cyl(.018,.68,0,0,.41,'wood',.043,12);b.cyl(.026,.016,0,0,-.075,'wood');return[0,.75];},
   knife:b=>{b.box(.024,.032,.1,0,0,0,'blk');b.box(.02,.06,.012,0,.008,.056,'chr');b.box(.005,.034,.15,0,.01,.135,'steel');b.box(.005,.022,.04,0,.018,.22,'steel',-.5);return[0,.24];},
+  taser:b=>{b.box(.034,.06,.15,0,.034,.02,0xf2c500);b.box(.03,.09,.04,0,-.035,-.03,0x141414,-.25);b.box(.014,.014,.04,.008,.07,.11,0x141414);b.box(.014,.014,.04,-.008,.07,.11,0x141414);b.box(.036,.02,.05,0,.04,.1,0x141414);return[.04,.14];},
   nightstick:b=>{b.cyl(.017,.6,0,0,.24,'blk');b.vcyl(.013,.1,0,-.05,-.02,'blk');b.cyl(.02,.014,0,0,-.065,'blk');return[0,.54];},
   golf:b=>{b.cyl(.013,.24,0,0,0,'blk');b.cyl(.007,.7,0,0,.47,'chr');b.box(.03,.05,.085,0,-.018,.84,'steel');return[0,.86];},
   crowbar:b=>{b.cyl(.012,.62,0,0,.22,'red');b.cyl(.012,.1,0,.035,.56,'red',undefined,8,-.95);b.cyl(.012,.07,0,.022,-.11,'red',undefined,8,.9);return[0,.6];},

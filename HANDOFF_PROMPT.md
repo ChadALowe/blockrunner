@@ -116,3 +116,8 @@ I tested with headless Chrome (puppeteer-core with SwiftShader). I loaded `dist/
 - Performance passes for low-end phones.
 
 Start by unzipping, running `python3 build.py` (after fixing the paths), and opening the result to check it loads. Then tell me you're ready.
+
+## UK police (latest)
+- Officers: custodian helmet + hi-vis vest on foot, peaked cap in the car. Patrol car is a white Battenburg saloon with a blue light bar and a nee-naw siren. None of these are sold in the clothes shop.
+- Kit by wanted level (`copKitFor`, `copEquip`, `copPose`, `taserZap` in `src/index.html`): 1 star nightstick (arrest by standing close for 2.2 s), 2 stars taser (stuns for 1.7 s from 3-9 m with line of sight, never while you are in a car, shared cooldown so no stun-lock), 3+ stars "armed response" pistols (4+ fire faster). The taser model is `GDEF.taser` and `GBY.taser` is not in `GUNS`, so it is not sold.
+- Bug fixed earlier: the stray-cop cleanup used to delete seated officers in a patrol car spawned over 60 m away. Seated cops are only removed with their car.
