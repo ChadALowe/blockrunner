@@ -130,3 +130,11 @@ After every change that works, commit and push to `main` on `ChadALowe/blockrunn
 - **Roadblocks** now start at 3 stars (max 2, only while you're in a car); the helicopter still comes at 4.
 - **Spike strips** (`makeSpike`, `updateSpikes`) lie 13 m in front of each roadblock across your lane and most of the road. Driving over one sets `car.flat=30`: top speed x0.55, wobbling steering, sparks. The Spray Shop clears it, as does swapping cars.
 - **Helicopter searchlight** (`heliLight`): additive cone plus a lit disc on the ground that chases you with a lag. While it's on you (within 7.5 m, with line of sight) your wanted level can't cool down (`lastSeen` is refreshed). Hide under a roof or break line of sight to shake it.
+
+## Safehouse (Flat 14, Grove Court)
+- The flat is a door on the front of the Grove Street tower block nearest the centre (chosen in `HOMELOT`, built in `placeHome`, a cyan ring plus minimap icon). Walk into the ring on foot with no wanted level to go in. It's a walkable room far off the map (`HX,HZ`, like the gun shop room); `INSIDE.type==='home'` routes to `homeUpdate`, and `ROOMC` holds the current room bounds for `insideBlocked`.
+- **Bed** (`bedMenu`): Save game and Sleep. Saving sets `HOMEDATA.saved`; after that you start the game outside the flat and respawn there after WASTED/BUSTED. Money, weapons, respect, turf and your look already auto-save on every change, so Save is mostly the respawn point and a summary.
+- **Wardrobe** (`wardrobeMenu`): up to 6 saved outfits with live preview. Anything bought at Threads or the barber is added automatically (`homeAddOutfit`).
+- **Lock-up keys** (`keysMenu`): park the last car you drove within 45 m of the door (not police cars), up to 4 stored; bring one round and it appears at the nearest free kerb (`roadNear`) flagged `c.keep` so the cleanup never deletes it. Stored data is type, colour, hp.
+- All of it lives in `localStorage['blockrunner_home']` as `{saved,at,outfits[],garage[]}`. Old saves have no key and behave as before.
+- `lmOpen/lmClose/lmRender` are a small reusable list menu (state `'list'`) that borrows the shop panel; rows can have `act`, `onSel` (live preview) and `del`.
