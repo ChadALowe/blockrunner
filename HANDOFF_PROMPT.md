@@ -152,3 +152,12 @@ Measured with a draw-call tally (see `br/test/perf*.js`). Start-of-game frame on
 - `pruneHuman()` strips the ~90 hidden wardrobe meshes from every passer-by at spawn (the player and gang members keep theirs, as they change clothes).
 - `disposeHuman()` frees bone textures when a ped is removed. Textures used to grow ~2 per second of play; now flat.
 - Ideas left: merge car sub-meshes (a car is ~10 draw calls), cheaper skinned meshes for people (13 parts each), instance trees by chunk.
+
+## Buses and taxis
+- Models (Blender, `blender/cars.py`, `CARS_EXTRA`): `taxi` (black cab with lit TAXI sign) and `bus` (red double-decker, 9.4 m, `track=1.12`, `hinge=1.25`). Fixed paint (not recoloured). `python3 cars.py only=taxi,bus` renders just those previews. `build.py` embeds both.
+- Traffic mix (`pickType(ai)`): ~9% taxis, ~4% buses (max 2 at once, never parked). Taxi layout = saloon; bus has its own `LAYOUTS.bus` and `CAR_HALF`.
+- Per-type physics in `CAR_TYPES`: `probe` (wall/collision probe offsets), `pr` (radius), `turn` (steering multiplier), `hl`/`hw` (half length/width). `carPhysics`, `carCars`, `carHits`, `aiUpdate` look-ahead and the chase camera all use them. Buses are not saved in the lock-up (`CAR_NAME` omits them; too long).
+- Bus stops: `placeBusStops()` puts up to 8 shelters with a roundel sign on pavements near the centre. `busDwell()` makes a bus pull up for 4-7 s at a stop on its kerb side.
+- Taxi fares (`TAXI`, `updateTaxi`): drive any taxi. A yellow beam/`T` marker shows the passenger; stop within 8 m to pick them up, then drive to the green `$` marker. Fare = $15 + 0.22/m, +50% for a fast ride. Cancelled by leaving the cab or by a wanted level.
+- Also fixed: the map waypoint never cleared/pulsed in the open world (its update hook sat in the flat's update); now in `update()`.
+- Tests: `br/test/bus.js`, `bus2.js`.

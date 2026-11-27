@@ -843,21 +843,24 @@ function makeModelCar(type,color){
   const all=Object.values(mats),byName=nm=>all.find(m=>m.name===nm);
   const paint=all.find(m=>m.name.startsWith('paint'))||lam(0x888888);
   const police=type==='police'||type==='policevan';
-  if(!police)paint.color.setHex(color);
+  if(!(police||type==='taxi'||type==='bus'))paint.color.setHex(color);
   const paint2=police?(byName('white')||paint):paint;
   const bar=police?[byName('lightRed'),byName('lightBlue')].filter(Boolean):null;
   const doors={};for(const k in (LAYOUTS[type]||SALOON_LAY).doors)doors[k]=root.getObjectByName(type+'_door_'+k);
   return{g,body,paint,paint2,bar:bar&&bar.length===2?bar:null,wheels,mats:all,doors};}
-const CAR_TYPES={saloon:{boost:1,hp:230},sports:{boost:1.15,hp:200},van:{boost:.88,hp:290},police:{boost:1.05,hp:330},policevan:{boost:.95,hp:420}};
-function pickType(){const r=Math.random();return r<.5?'saloon':r<.72?'sports':'van';}
+const CAR_TYPES={saloon:{boost:1,hp:230},sports:{boost:1.15,hp:200},van:{boost:.88,hp:290},police:{boost:1.05,hp:330},policevan:{boost:.95,hp:420},taxi:{boost:1.03,hp:260},
+  bus:{boost:.72,hp:700,turn:.6,hl:4.7,hw:1.3,probe:[3.3,0,-3.3],pr:1.32}};
+function pickType(ai){const r=Math.random();
+  if(ai==='traffic'){if(r<.04&&cars.filter(c=>c.type==='bus').length<2)return'bus';if(r<.13)return'taxi';}else if(r<.05)return'taxi';
+  const q=Math.random();return q<.5?'saloon':q<.72?'sports':'van';}
 
 const cars=[];
 function makeCar(x,z,h,ai,police,type){
-  type=police?(type==='policevan'?'policevan':'police'):(type||pickType());
+  type=police?(type==='policevan'?'policevan':'police'):(type||pickType(ai));
   const m=MODELS[type]?makeModelCar(type,pick(carColors)):makeCarMesh(pick(carColors),police);
   const c={m,pos:new V3(x,0,z),h,vel:new V3(),F:0,L:0,prevF:0,yawR:0,steer:0,steerIn:0,throttle:0,hb:false,ai,police,
     hp:police?150:100,sirens:police,flat:0,boost:1,copsOut:false,burnt:false,burnT:0,stuckT:0,revT:0,blockT:0,ignoreT:0,cruise:police?13:rf(9,13),pitch:0,roll:0,spin:0,smokeT:0,hopY:0,hopV:0,direct:false,nav:null};
-  c.type=type;c.boost=CAR_TYPES[type].boost;c.hp=CAR_TYPES[type].hp;c.maxHp=c.hp;
+  c.type=type;c.probe=CAR_TYPES[type].probe||[1.25,-1.25];c.pr=CAR_TYPES[type].pr||1.15;c.turn=CAR_TYPES[type].turn||1;c.hl=CAR_TYPES[type].hl||2.42;c.boost=CAR_TYPES[type].boost;c.hp=CAR_TYPES[type].hp;c.maxHp=c.hp;
   {const LY=LAYOUTS[type]||SALOON_LAY;c.occ={};for(const k in LY.seats)c.occ[k]=null;c.sq={};c.doorO={};c.doorTgt={};for(const k in LY.doors){c.sq[k]=null;c.doorO[k]=0;c.doorTgt[k]=0;}}c.rageT=0;
   resyncNav(c);cars.push(c);
   if(ai==='traffic'||ai==='police'){seatNew(c,'d',police);if(police)seatNew(c,'p',true);
@@ -1041,7 +1044,8 @@ const LAYOUTS={saloon:SALOON_LAY,police:SALOON_LAY,
       b1:{x:.39,f:-.62,y:.74,yaw:-Math.PI/2,door:'bl',back:true},b2:{x:.39,f:-1.5,y:.74,yaw:-Math.PI/2,door:'bl',back:true},
       b3:{x:-.39,f:-.62,y:.74,yaw:Math.PI/2,door:'br',back:true},b4:{x:-.39,f:-1.5,y:.74,yaw:Math.PI/2,door:'br',back:true}},
     doors:{r:{x:-1.7,f:.62},l:{x:1.7,f:.62},bl:{x:.48,f:-3.1,out:[0,-1],max:1.9},br:{x:-.48,f:-3.1,out:[0,-1],max:1.9}}}};
-LAYOUTS.policevan=LAYOUTS.van;
+LAYOUTS.policevan=LAYOUTS.van;LAYOUTS.taxi=SALOON_LAY;
+LAYOUTS.bus={seats:{d:{x:-.45,f:3.0,y:1.0,door:'r'},p:{x:.45,f:3.0,y:1.0,door:'l'}},doors:{r:{x:-2.15,f:2.9},l:{x:2.15,f:2.9}}};
 const layOf=c=>LAYOUTS[c.type]||SALOON_LAY;
 const seatKeys=c=>Object.keys(layOf(c).seats);
 const doorOfSeat=(c,k)=>(layOf(c).seats[k]||layOf(c).seats.d).door;
@@ -1053,7 +1057,7 @@ function carL2W(c,lx,ly,lz,out){const fx=Math.sin(c.h),fz=Math.cos(c.h),ax=Math.
 function seatLocal(c,seat){const S=layOf(c).seats[seat]||layOf(c).seats.d,y=S.yaw||0;return{x:S.x-.18*Math.sin(y),y:S.y-.81,z:S.f-.18*Math.cos(y),yaw:y};}
 // walking round a car: next point to head for from (fx,fz) to (tx,tz) without cutting through car c.
 // Shortest path over the four corners of a box a little bigger than the car. Returns {x,z,direct}.
-const CAR_HALF={saloon:[1.12,2.42],police:[1.12,2.5],sports:[1.12,2.42],van:[1.12,2.42],policevan:[1.12,2.5]};
+const CAR_HALF={saloon:[1.12,2.42],police:[1.12,2.5],sports:[1.12,2.42],van:[1.12,2.42],policevan:[1.12,2.5],taxi:[1.12,2.42],bus:[1.3,4.7]};
 function aroundCar(c,fx,fz,tx,tz){
   const ch=Math.cos(c.h),sh=Math.sin(c.h),toL=(x,z)=>{const dx=x-c.pos.x,dz=z-c.pos.z;return[dx*ch-dz*sh,dx*sh+dz*ch];};
   const HB=CAR_HALF[c.type]||CAR_HALF.saloon,hw=HB[0]+.33,hl=HB[1]+.33,cw=hw+.17,cl=hl+.17;
@@ -1285,10 +1289,11 @@ function aiUpdate(c,dt){
   else{const p=navTarget(c,chase,dt);tx=p.x;tz=p.z;if(chase)desired=27;desired=Math.min(desired,chase?Math.max(p.cap*1.6,12):p.cap);if(p.hold&&!chase)desired=0;}
   const want=Math.atan2(tx-c.pos.x,tz-c.pos.z),diff=angDiff(c.h,want);
   let steer=clamp(-diff*2.3,-1,1);
+  if(c.type==='bus'&&!chase&&busDwell(c,dt))desired=0;
   desired*=1-Math.min(.65,Math.abs(diff)*.9);
   let block=false;
   if(c.ignoreT>0)c.ignoreT-=dt;
-  else if(!chase){const look=5+Math.max(0,c.F)*.8;
+  else if(!chase){const look=5+Math.max(0,c.F)*.8+(c.hl-2.42);
     const tst=(x,z,w)=>{const ox=x-c.pos.x,oz=z-c.pos.z,lf=ox*fx+oz*fz,lr=ox*rx+oz*rz;return lf>1.5&&lf<look&&Math.abs(lr)<w;};
     for(const o of cars)if(o!==c&&tst(o.pos.x,o.pos.z,2.2)){block=true;break;}
     c.pedX=false;let byYou=false;
@@ -1314,24 +1319,25 @@ function carPhysics(c,dt){
   if(c.hb){const r=Math.min(Math.abs(F),9*dt);F-=Math.sign(F)*r;}
   L*=Math.exp(-(c.hb?1.1:7.5)*dt);
   const sp=Math.abs(F);
-  const yaw=c.steer*2.35*Math.min(1,sp/5)/(1+sp*.022)*Math.sign(F)*(c.hb?1.45:1)+(c.flat>0?Math.sin(now*13)*.3*Math.min(1,sp/10):0);
+  const yaw=c.steer*2.35*Math.min(1,sp/5)/(1+sp*.022)*Math.sign(F)*(c.hb?1.45:1)*c.turn+(c.flat>0?Math.sin(now*13)*.3*Math.min(1,sp/10):0);
   c.h-=yaw*dt;c.yawR=yaw;
   c.vel.x=fx*F+rx*L;c.vel.z=fz*F+rz*L;
   c.pos.x+=c.vel.x*dt;c.pos.z+=c.vel.z*dt;
   // walls
   const nfx=Math.sin(c.h),nfz=Math.cos(c.h);
-  for(const s of[1.25,-1.25]){const p={x:c.pos.x+nfx*s,z:c.pos.z+nfz*s},bx=p.x,bz=p.z;const n=resolveCircle(p,1.15);
+  for(const s of c.probe){const p={x:c.pos.x+nfx*s,z:c.pos.z+nfz*s},bx=p.x,bz=p.z;const n=resolveCircle(p,c.pr);
     if(n){c.pos.x+=p.x-bx;c.pos.z+=p.z-bz;const vn=c.vel.x*n.x+c.vel.z*n.z;
       if(vn<0){c.vel.x-=1.35*vn*n.x;c.vel.z-=1.35*vn*n.z;c.vel.multiplyScalar(.92);
         if(-vn>6){damageCar(c,(-vn-6)*2.4,false);noise(.3,900,volAt(c.pos.x,c.pos.z,Math.min(.8,-vn/25)));sparks(new V3(c.pos.x+nfx*s*1.6,.8,c.pos.z+nfz*s*1.6));if(c===player.car)shake=Math.max(shake,Math.min(1,-vn/22));}}}}
   const F2=c.vel.x*nfx+c.vel.z*nfz;c.F=F2;
 }
 function carCars(){
-  for(let a=0;a<cars.length;a++){const A=cars[a];for(let b=a+1;b<cars.length;b++){const B=cars[b];if(d2(A.pos.x,A.pos.z,B.pos.x,B.pos.z)>36)continue;
+  for(let a=0;a<cars.length;a++){const A=cars[a];for(let b=a+1;b<cars.length;b++){const B=cars[b];if(d2(A.pos.x,A.pos.z,B.pos.x,B.pos.z)>(A.hl+B.hl+2)**2)continue;
     const fa=[Math.sin(A.h),Math.cos(A.h)],fb=[Math.sin(B.h),Math.cos(B.h)];
-    for(const sa of[1.25,-1.25])for(const sb of[1.25,-1.25]){
-      let nx=(A.pos.x+fa[0]*sa)-(B.pos.x+fb[0]*sb),nz=(A.pos.z+fa[1]*sa)-(B.pos.z+fb[1]*sb);const d=Math.hypot(nx,nz);if(d>=2.3||d<1e-4)continue;
-      nx/=d;nz/=d;const pen=(2.3-d)/2;A.pos.x+=nx*pen;A.pos.z+=nz*pen;B.pos.x-=nx*pen;B.pos.z-=nz*pen;
+    const RR=A.pr+B.pr;
+    for(const sa of A.probe)for(const sb of B.probe){
+      let nx=(A.pos.x+fa[0]*sa)-(B.pos.x+fb[0]*sb),nz=(A.pos.z+fa[1]*sa)-(B.pos.z+fb[1]*sb);const d=Math.hypot(nx,nz);if(d>=RR||d<1e-4)continue;
+      nx/=d;nz/=d;const pen=(RR-d)/2;A.pos.x+=nx*pen;A.pos.z+=nz*pen;B.pos.x-=nx*pen;B.pos.z-=nz*pen;
       const rel=(A.vel.x-B.vel.x)*nx+(A.vel.z-B.vel.z)*nz;
       if(rel<0){const j=-1.3*rel/2;A.vel.x+=j*nx;A.vel.z+=j*nz;B.vel.x-=j*nx;B.vel.z-=j*nz;
         if(-rel>6){const oc=A===player.car?B:B===player.car?A:null,od=oc&&oc.occ.d;
@@ -1342,12 +1348,13 @@ function carCars(){
 function carHits(c){
   const sp=Math.hypot(c.vel.x,c.vel.z);if(sp<.3)return;
   const fx=Math.sin(c.h),fz=Math.cos(c.h),rx=-fz,rz=fx;
-  for(const p of peds){if(p.state==='dead'||p.state==='seated'||p.inSeq)continue;const ox=p.pos.x-c.pos.x,oz=p.pos.z-c.pos.z;if(ox*ox+oz*oz>12)continue;
-    const lf=ox*fx+oz*fz,lr=ox*rx+oz*rz;if(Math.abs(lf)<2.5&&Math.abs(lr)<1.35){
+  const HB=CAR_HALF[c.type]||CAR_HALF.saloon,RH=(HB[1]+1.2)**2;
+  for(const p of peds){if(p.state==='dead'||p.state==='seated'||p.inSeq)continue;const ox=p.pos.x-c.pos.x,oz=p.pos.z-c.pos.z;if(ox*ox+oz*oz>RH)continue;
+    const lf=ox*fx+oz*fz,lr=ox*rx+oz*rz;if(Math.abs(lf)<HB[1]+.08&&Math.abs(lr)<HB[0]+.23){
       if(sp>4.5){killPed(p,{x:c.vel.x*1.1,y:3+sp*.18,z:c.vel.z*1.1},c===player.car);thump(140,.15,volAt(c.pos.x,c.pos.z,.5));}
       else{const s=Math.sign(lr)||1;p.pos.x+=rx*s*(1.35-Math.abs(lr));p.pos.z+=rz*s*(1.35-Math.abs(lr));if(p.state==='walk'&&c===player.car){p.state='flee';p.fleeT=4;p.threat={x:c.pos.x,z:c.pos.z};}}}}
   if(!player.car&&!player.dead&&sp>5&&player.hitCD<=0){const ox=player.pos.x-c.pos.x,oz=player.pos.z-c.pos.z;
-    const lf=ox*fx+oz*fz,lr=ox*rx+oz*rz;if(Math.abs(lf)<2.65&&Math.abs(lr)<1.5&&player.pos.y<1.4){
+    const lf=ox*fx+oz*fz,lr=ox*rx+oz*rz;if(Math.abs(lf)<HB[1]+.23&&Math.abs(lr)<HB[0]+.38&&player.pos.y<1.4){
       player.hitCD=.7;player.knock.set(c.vel.x*.9,0,c.vel.z*.9);player.vy=3+sp*.12;player.stun=2.3;shake=.6;thump(140,.2,.6);hurtPlayer(sp*2.1);}}
 }
 const PEDV=[];
@@ -1718,7 +1725,7 @@ function updateCamera(dt){
     camLift+=((carAim?1:0)-camLift)*Math.min(1,dt*7);
     if(carAim)camPitch=Math.min(camPitch,.32);
     const rx=-Math.cos(camYaw),rz=Math.sin(camYaw);
-    target=new V3(c.pos.x+rx*camLift*1.1,1.7+camLift*2.2+c.hopY,c.pos.z+rz*camLift*1.1);dist=8.6+Math.abs(c.F)*.05-camLift*1.6;
+    const big=c.hl>4;target=new V3(c.pos.x+rx*camLift*1.1,(big?3.1:1.7)+camLift*2.2+c.hopY,c.pos.z+rz*camLift*1.1);dist=(big?14.5:8.6)+Math.abs(c.F)*.05-camLift*1.6;
     camera.fov+=(65+Math.min(18,Math.abs(c.F)*.35)-camera.fov)*Math.min(1,dt*3);
   }else{const aim=mouse.right||T.aim;const zg=aim&&curGun().zoom;const rx=-Math.cos(camYaw),rz=Math.sin(camYaw);const so=zg?.55:aim?.8:.4;
     const by=player.dead?.4:player.pos.y+1.5;
@@ -1766,6 +1773,7 @@ function drawMini(){
   if(heli&&!heli.dead){const p=miniXY(heli.pos.x,heli.pos.z,84);mctx.fillStyle=Math.floor(now*5)%2?'#9fc0ff':'#3070ff';mctx.fillRect(p[0]-4,p[1]-4,8,8);}
   if(mission&&mission.blip){const b=mission.blip;miniIcon(b.x,b.z,b.col,null,6,84);}
   if(WP)miniIcon(WP.x,WP.z,'#ff9a1a','\u25bc',7,84);
+  if(TAXI.st==='wait')miniIcon(TAXI.x,TAXI.z,'#ffd23f','T',7,84);else if(TAXI.st==='ride'&&TAXI.dest)miniIcon(TAXI.dest.x,TAXI.dest.z,'#4fe08a','$',7,84);
 }
 miniEl.addEventListener('pointerdown',e=>{if(state==='game'){e.preventDefault();e.stopPropagation();openMap();}});
 function updateHUD(){
@@ -1789,6 +1797,68 @@ function updateHUD(){
 }
 
 // ---------------- world population ----------------
+// ---------------- bus stops: shelters on the kerb, buses pull up and wait a few seconds ----------------
+const BUSSTOPS=[];
+function placeBusStops(){
+  if(BUSSTOPS.length)return;
+  const cand=[];
+  for(const E of REDGES)for(const dir of[1,-1]){const L=E.lanes[dir];if(L.len<80)continue;for(const f of[.5,.4,.6,.32,.68,.45,.55]){const Q=lanePt(L,L.len*f);cand.push({E,L,f,d:Math.hypot(Q.x,Q.z)});}}
+  cand.sort((a,b)=>a.d-b.d);
+  const glass=new THREE.MeshLambertMaterial({color:0x9fc6d8,transparent:true,opacity:.35}),steel=lam(0x4a4f57),red=lam(0xc8102e),white=lam(0xf2f2f2);
+  for(const c of cand){if(BUSSTOPS.length>=8)break;
+    const Q=lanePt(c.L,c.L.len*c.f),tl=Math.hypot(Q.tx,Q.tz)||1,tx=Q.tx/tl,tz=Q.tz/tl,o=c.E.kerbOff-c.E.lane+1.35,x=Q.x+tz*o,z=Q.z-tx*o,h=Math.atan2(tx,tz);
+    if(BUSSTOPS.some(S=>d2(S.x,S.z,x,z)<40*40))continue;
+    if(SHOPDOORS.some(q=>d2(q[0],q[1],x,z)<10*10)||(HOMEPT&&d2(HOMEPT[0],HOMEPT[1],x,z)<10*10)||(LOCKPT&&d2(LOCKPT[0],LOCKPT[1],x,z)<12*12))continue;
+    if(colNear(x-2.4,x+2.4,z-2.4,z+2.4).some(q=>colInside(q,x,z,2.1)))continue;
+    const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=h;
+    const add=(geo,m,px,py,pz)=>{const q=new THREE.Mesh(geo,m);q.position.set(px,py,pz);q.castShadow=true;g.add(q);return q;};
+    add(new THREE.BoxGeometry(1.4,.12,3.0),red,.1,2.45,0);                 // roof
+    add(new THREE.BoxGeometry(.06,1.9,2.9),glass,.72,1.4,0);               // back panel
+    for(const sz of[-1.4,1.4])add(new THREE.BoxGeometry(.1,2.4,.1),steel,.7,1.2,sz);
+    add(new THREE.BoxGeometry(.5,.08,2.0),steel,.5,.55,0);                 // bench
+    for(const sz of[-.95,.95])add(new THREE.BoxGeometry(.05,.5,.05),steel,.5,.28,sz);
+    // flag sign on a pole at the kerb end
+    add(new THREE.CylinderGeometry(.05,.05,3.1,8),steel,-.35,1.55,-2.0);
+    const disc=add(new THREE.CylinderGeometry(.36,.36,.05,20),red,-.35,3.05,-2.0);disc.rotation.z=Math.PI/2;
+    add(new THREE.BoxGeometry(.06,.1,.56),white,-.35,3.05,-2.0);
+    scene.add(g);
+    addColBox(x,z,1.5,3.0,h,2.4,true);addCol(x+Math.sin(h)*-2.0-Math.cos(h)*.35-.1,x+Math.sin(h)*-2.0-Math.cos(h)*.35+.1,z+Math.cos(h)*-2.0+Math.sin(h)*.35-.1,z+Math.cos(h)*-2.0+Math.sin(h)*.35+.1,3,true);
+    BUSSTOPS.push({x,z,h});}}
+function busDwell(c,dt){
+  if(c.dwellT>0){c.dwellT-=dt;if(c.dwellT<=0)c.stopSeen=c.dwellStop;return true;}
+  if(c.stopSeen&&d2(c.pos.x,c.pos.z,c.stopSeen.x,c.stopSeen.z)>16*16)c.stopSeen=null;
+  for(const S of BUSSTOPS){if(S===c.stopSeen)continue;
+    const dx=S.x-c.pos.x,dz=S.z-c.pos.z;if(dx*dx+dz*dz>8*8)continue;
+    if(dx*Math.cos(c.h)-dz*Math.sin(c.h)<1.5)continue;      // only a stop on the kerb (left) side
+    c.dwellStop=S;c.dwellT=4+Math.random()*3;return true;}
+  return false;}
+
+// ---------------- taxi fares: drive a black cab and passengers flag you down ----------------
+const TAXI={st:'off',x:0,z:0,dest:null,t:0,fare:0,dist:0,wait:0,cool:0,beam:null};
+function taxiBeam(col){if(!TAXI.beam){TAXI.beam=new THREE.Mesh(new THREE.CylinderGeometry(.7,.7,80,10,1,true),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.4,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));TAXI.beam.frustumCulled=false;scene.add(TAXI.beam);}
+  TAXI.beam.material.color.setHex(col);return TAXI.beam;}
+function taxiPick(minD,maxD,from){const f=from||focus();for(let k=0;k<60;k++){const s=roadSpot(true);if(!s)continue;const d=Math.sqrt(d2(s.x,s.z,f.x,f.z));if(d>=minD&&d<=maxD)return s;}return null;}
+function taxiEnd(msg,cool){TAXI.st='off';TAXI.dest=null;if(TAXI.beam)TAXI.beam.visible=false;TAXI.cool=cool||4;if(msg)note(msg,3.5);}
+function updateTaxi(dt){
+  const c=player.car,ok=c&&c.type==='taxi'&&!player.dead&&!c.burnt;
+  if(!ok){if(TAXI.st!=='off')taxiEnd(TAXI.st==='ride'?'Your passenger got out':null,6);return;}
+  if(TAXI.cool>0){TAXI.cool-=dt;return;}
+  if(TAXI.st==='off'){if(stars()>0)return;const s=taxiPick(70,190);if(!s)return;
+    TAXI.x=s.x;TAXI.z=s.z;TAXI.st='wait';TAXI.wait=0;taxiBeam(0xffd23f).visible=true;TAXI.beam.position.set(s.x,40,s.z);
+    note('Fare! Pick up your passenger at the <b>yellow marker</b>',4.5);blip(880);return;}
+  if(stars()>0&&TAXI.st==='wait'){taxiEnd(null,8);return;}
+  const slow=Math.abs(c.F)<2.8;
+  if(TAXI.beam)TAXI.beam.material.opacity=.3+.15*Math.sin(now*4);
+  if(TAXI.st==='wait'){TAXI.wait+=dt;
+    if(slow&&d2(c.pos.x,c.pos.z,TAXI.x,TAXI.z)<8*8){const s=taxiPick(180,380,{x:TAXI.x,z:TAXI.z});if(!s){TAXI.wait=0;return;}
+      TAXI.dest={x:s.x,z:s.z};TAXI.dist=Math.sqrt(d2(TAXI.x,TAXI.z,s.x,s.z));TAXI.st='ride';TAXI.t=0;TAXI.fare=Math.round(15+TAXI.dist*.22);
+      taxiBeam(0x4fe08a).visible=true;TAXI.beam.position.set(s.x,40,s.z);note('Passenger aboard. Take them to the <b>green marker</b>',4.5);blip(1100);}
+    else if(TAXI.wait>150)taxiEnd('Your passenger gave up waiting',6);
+    return;}
+  if(TAXI.st==='ride'){TAXI.t+=dt;
+    if(slow&&d2(c.pos.x,c.pos.z,TAXI.dest.x,TAXI.dest.z)<9*9){const bonus=TAXI.t<TAXI.dist/6?Math.round(TAXI.fare*.5):0;addMoney(TAXI.fare+bonus);
+      taxiEnd('Fare paid <b>$'+(TAXI.fare+bonus)+'</b>'+(bonus?' (fast ride bonus)':''),3);blip(1300);}}}
+
 function populate(){
   {const E=REDGES.find(e=>e.a==='H1'&&e.b==='C'),L=E.lanes[1];
     // a spot on the High Street pavement well clear of every shop door
@@ -1800,7 +1870,7 @@ function populate(){
   for(let k=0;k<12;k++)spawnCarOnRoad({parked:true,min:15});
   for(let k=0;k<TRAFFIC;k++)spawnCarOnRoad({min:25});
   for(let k=0;k<PED_COUNT;k++)spawnPed({});
-  restoreLockup();
+  restoreLockup();placeBusStops();
 }
 
 function manage(dt){
@@ -1884,7 +1954,7 @@ function update(dt){
   for(const c of cars)carVisual(c,dt);
   updateCamera(dt);
   const f=focus();sun.position.set(f.x+SUNOFF.x,SUNOFF.y,f.z+SUNOFF.z);sun.target.position.set(f.x,0,f.z);
-  updateHUD();updateAudio();
+  updateWaypoint();updateTaxi(dt);updateHUD();updateAudio();
 }
 // ======================================================================
 // SETTINGS
@@ -2664,7 +2734,7 @@ function insideUpdate(dt){
   if(noteT>0){noteT-=dt;if(noteT<=0)noteEl.style.display='none';}
   updateParts(dt);updateCamera(dt);
   sun.position.set(player.pos.x+SUNOFF.x,SUNOFF.y,player.pos.z+SUNOFF.z);sun.target.position.set(player.pos.x,0,player.pos.z);
-  updateWaypoint();updateHUD();updateAudio();}
+  updateHUD();updateAudio();}
 // ======================================================================
 // SAFEHOUSE: Flat 14, Grove Court. A bed (save / sleep), a wardrobe (saved outfits) and the keys to your lock-up (stored cars).
 // ======================================================================
@@ -2786,7 +2856,7 @@ function updateWaypoint(){if(!WP)return;const f=focus();if(d2(f.x,f.z,WP.x,WP.z)
   wpBeam.material.opacity=.25+.15*Math.sin(now*4);}
 const bmEl=document.getElementById('bmap'),bmc=document.getElementById('bmc'),bmx=bmc.getContext('2d');
 const BM={x:0,z:0,s:1,W:0,H:0,sMin:.1,sMax:5,ptrs:new Map(),moved:0,pd:0};
-function bmLegend(){const it=[['#4fd2ff','\u2302','Home'],['#ffb04a','L','Lock-up'],['#ff7fc0','S','Spray shop'],['#6aa8ff','B','Barber'],['#4fd07a','C','Clothes'],['#ff5a4a','G','Gun shop'],['#ffd23f','!','Mission'],['#ff9a1a','\u25bc','Waypoint']];
+function bmLegend(){const it=[['#4fd2ff','\u2302','Home'],['#ffb04a','L','Lock-up'],['#ff7fc0','S','Spray shop'],['#6aa8ff','B','Barber'],['#4fd07a','C','Clothes'],['#ff5a4a','G','Gun shop'],['#ffd23f','!','Mission'],['#ff9a1a','\u25bc','Waypoint'],['#ffd23f','T','Taxi fare']];
   document.getElementById('bmleg').innerHTML=it.map(a=>'<div><i style="background:'+a[0]+'">'+a[1]+'</i>'+a[2]+'</div>').join('');
   document.getElementById('bmhint').innerHTML=touchUI?'Drag to move · pinch to zoom<br>Tap the map to set a waypoint':'Drag or WASD to move · wheel or +/- to zoom<br>Click to set a waypoint · Enter = at crosshair · M/Esc close';}
 const bmDpr=()=>Math.min(2,devicePixelRatio||1);
@@ -2842,6 +2912,7 @@ function mapFrame(dt){
   if(ATTACK){const b=blocks[ATTACK.bi];icon(b.cx,b.cz,'#ff3030','!',11);}
   if(mission&&mission.blip){const b=mission.blip;icon(b.x,b.z,b.col,null,9);}
   if(WP)icon(WP.x,WP.z,'#ff9a1a','\u25bc',12);
+  if(TAXI.st==='wait')icon(TAXI.x,TAXI.z,'#ffd23f','T',11);else if(TAXI.st==='ride'&&TAXI.dest)icon(TAXI.dest.x,TAXI.dest.z,'#4fe08a','$',11);
   {const f=focus(),p=S(f.x,f.z),fa=player.car?player.car.h:player.facing,ax=Math.sin(fa),az=Math.cos(fa),bx=-az,bz=ax,k=11*u;
     x.fillStyle='#fff';x.strokeStyle='#000';x.lineWidth=2*u;x.beginPath();x.moveTo(p[0]+ax*k*1.5,p[1]+az*k*1.5);x.lineTo(p[0]-ax*k+bx*k,p[1]-az*k+bz*k);x.lineTo(p[0]-ax*k*.4,p[1]-az*k*.4);x.lineTo(p[0]-ax*k-bx*k,p[1]-az*k-bz*k);x.closePath();x.fill();x.stroke();}
   x.strokeStyle='rgba(255,255,255,.85)';x.lineWidth=2*u;x.beginPath();x.moveTo(W/2-12*u,H/2);x.lineTo(W/2-4*u,H/2);x.moveTo(W/2+4*u,H/2);x.lineTo(W/2+12*u,H/2);x.moveTo(W/2,H/2-12*u);x.lineTo(W/2,H/2-4*u);x.moveTo(W/2,H/2+4*u);x.lineTo(W/2,H/2+12*u);x.stroke();
@@ -2915,7 +2986,7 @@ function wardrobeMenu(){
   lmOpen({title:'Wardrobe',face:Math.PI/2,sub:'Buy new clothes at Threads and they land here. '+HOMEDATA.outfits.length+'/'+OUTFIT_SLOTS+' outfits',rows,sel:Math.max(0,HOMEDATA.outfits.findIndex(o=>sameLook(o,cur)))});}
 
 // ---- the lock-up: a garage on the next plot along the road. The roller door opens as you approach; any car you leave inside is saved.
-const CAR_NAME={saloon:'Saloon',sports:'Sports coupe',van:'Van'};
+const CAR_NAME={saloon:'Saloon',sports:'Sports coupe',van:'Van',taxi:'Black cab'};
 let LOCK=null,lockT=0,lockReady=false;
 function buildLockup(){
   const Lt=LOCKLOT;if(!Lt)return;

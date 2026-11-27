@@ -3,7 +3,7 @@ import base64, json, os
 H = os.path.dirname(os.path.abspath(__file__))
 A = lambda *p: os.path.join(H, *p)
 src = open(A('src', 'index.html')).read()
-data = {k: base64.b64encode(open(A('assets', 'cars', f'{k}.glb'), 'rb').read()).decode() for k in ['saloon', 'sports', 'van', 'police', 'policevan']}
+data = {k: base64.b64encode(open(A('assets', 'cars', f'{k}.glb'), 'rb').read()).decode() for k in ['saloon', 'sports', 'van', 'police', 'policevan', 'taxi', 'bus']}
 for k in ['male', 'female']: data['human_' + k] = base64.b64encode(open(A('assets', 'people', f'{k}.glb'), 'rb').read()).decode()
 assert '/*MODEL_DATA*/{}' in src and '/*ART_CSS*/' in src
 # the UK city generator lives in its own file so it can be previewed and tested in node

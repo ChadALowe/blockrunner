@@ -231,14 +231,14 @@ def build_car(cfg, x_off):
             d = join([d, mir] + extra_, pid + '_door_' + side)
         else:
             d = join([d] + extra_, pid + '_door_' + side) if extra_ else d; d.name = pid + '_door_' + side
-        bpy.context.scene.cursor.location = (sgn * 1.0, -hinge_f, 0)
+        bpy.context.scene.cursor.location = (sgn * cfg.get('hinge', 1.0), -hinge_f, 0)
         bpy.ops.object.select_all(action='DESELECT'); d.select_set(True); bpy.context.view_layer.objects.active = d
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
         smooth(d); door_objs.append(d)
     wheels = []
     r = cfg['wheel_r']
     for nm, sx, f in (('wheel_fl', 1, cfg['wheels_f'][0]), ('wheel_fr', -1, cfg['wheels_f'][0]), ('wheel_rl', 1, cfg['wheels_f'][1]), ('wheel_rr', -1, cfg['wheels_f'][1])):
-        w = wheel(pid + '_' + nm, sx * .95, f, r, .3); smooth(w, 50); wheels.append(w)
+        w = wheel(pid + '_' + nm, sx * cfg.get('track', .95), f, r, cfg.get('wheel_w', .3)); smooth(w, 50); wheels.append(w)
     root = bpy.data.objects.new(pid, None); bpy.context.collection.objects.link(root)
     for o in [b] + wheels + door_objs: o.parent = root
     root.location.x = x_off
@@ -362,6 +362,69 @@ def policevan_extra(parts):
     parts.append(box('push', (1.6, .12, .5), (0, -2.5, .55), COMMON['trim']))
     for s in (-1, 1): parts.append(box('pushbar', (.1, .3, .5), (s * .65, -2.38, .55), COMMON['trim']))
 
+# ---------------- taxi: a black cab (saloon platform, taller roof, lit TAXI sign) ----------------
+TAXI_KEYS = [
+    (2.22, .42, .92, .95, .78, .88, .88, .86, .02),
+    (2.08, .34, .96, 1.0, .96, .90, .90, 1.05, .03),
+    (0.92, .32, .98, 1.0, 1.04, .90, .90, 1.16, .04),
+    (0.82, .32, .98, 1.0, 1.05, .90, .88, 1.18, .04),
+    (0.02, .32, .98, 1.0, 1.06, .90, .84, 1.86, .05),
+    (-1.52, .32, .98, 1.0, 1.06, .90, .84, 1.86, .05),
+    (-1.94, .32, .98, 1.0, 1.05, .92, .90, 1.30, .04),
+    (-2.08, .34, .96, 1.0, 1.02, .92, .92, 1.10, .03),
+    (-2.22, .42, .92, .95, .86, .90, .90, .90, .02)]
+
+def taxi_extra(parts):
+    parts.append(box('sign', (.74, .26, .17), (0, .45, 1.98), COMMON['indicator'], bevel=.03))
+    parts.append(box('signbase', (.5, .2, .05), (0, .45, 1.92), COMMON['trim']))
+    for s in (-1, 1):
+        try:
+            bpy.ops.object.text_add(location=(0, .45, 1.98)); t = bpy.context.object; t.data.body = 'TAXI'; t.data.size = .13; t.data.extrude = .004
+            t.data.align_x = 'CENTER'; t.data.align_y = 'CENTER'
+            t.rotation_euler = (math.pi / 2, 0, 0) if s > 0 else (math.pi / 2, 0, math.pi)
+            t.location = (0, .45 + (-.131 if s > 0 else .131), 1.98)
+            bpy.ops.object.convert(target='MESH'); t.data.materials.clear(); t.data.materials.append(COMMON['trim']); parts.append(t)
+        except Exception as e:
+            print('taxi text skipped', e)
+    parts.append(box('luggage', (1.5, .8, .02), (0, -1.9, 1.0), COMMON['trim']))
+
+# ---------------- bus: a red double-decker ----------------
+def _bk(f, zb, w, zroof): return (f, zb, w - .06, w, 1.02, w - .04, w - .1, zroof, .02)
+BUS_KEYS = [
+    (4.62, .55, 1.14, 1.18, 1.0, 1.12, 1.06, 4.05, .02),
+    (4.48, .46, 1.20, 1.24, 1.02, 1.20, 1.14, 4.22, .02),
+    (3.9, .42, 1.22, 1.25, 1.04, 1.22, 1.17, 4.3, .02),
+    (-4.4, .42, 1.22, 1.25, 1.04, 1.22, 1.17, 4.3, .02),
+    (-4.55, .5, 1.18, 1.21, 1.02, 1.18, 1.12, 4.2, .02),
+    (-4.62, .56, 1.14, 1.18, 1.0, 1.12, 1.06, 4.1, .02)]
+BUS_ZONES = [(4.7, 3.9, 'ws'), (3.9, -4.7, 'side')]
+
+def bus_extra(parts):
+    G, R, T = COMMON['glass'], COMMON['paint_bus'], COMMON['trim']
+    for s in (-1, 1):
+        parts.append(box('belt', (.07, 9.0, .42), (s * 1.255, 0, 2.5), R, bevel=.02))
+        parts.append(box('skirt', (.07, 9.0, .1), (s * 1.255, 0, 4.28), R))
+        parts.append(box('whiteband', (.075, 9.0, .07), (s * 1.255, 0, 2.18), COMMON['white']))
+        for k in range(-3, 4):
+            parts.append(box('pl', (.08, .12, 1.4), (s * 1.25, k * 1.3, 1.72), R))
+            parts.append(box('pu', (.08, .12, 1.5), (s * 1.25, k * 1.3, 3.4), R))
+    # lower windscreen and cab, upper deck front window, destination blind
+    parts.append(box('wsl', (2.1, .06, 1.05), (0, -4.64, 1.62), G))
+    parts.append(box('wsu', (2.1, .06, .95), (0, -4.64, 3.45), G))
+    parts.append(box('blind', (1.5, .06, .28), (0, -4.64, 2.7), COMMON['indicator']))
+    parts.append(box('fglass', (2.1, .06, .9), (0, 4.64, 3.45), G))
+    parts.append(box('rwin', (1.8, .06, .8), (0, 4.64, 1.7), G))
+    parts.append(box('roofline', (2.34, 9.0, .08), (0, 0, 4.32), COMMON['white']))
+    parts.append(box('bumpf', (2.4, .2, .25), (0, -4.66, .55), T)); parts.append(box('bumpr', (2.4, .2, .25), (0, 4.66, .55), T))
+
+CARS_EXTRA = [
+    dict(id='taxi', label='Black cab', color=0x16161a, keys=TAXI_KEYS, zones=SALOON_ZONES, wheels_f=(1.38, -1.38), arch_z=.8, wheel_r=.38,
+         nose_f=2.22, nose_z=.78, tail_f=-2.22, tail_z=.86, mirror_f=.7, mirror_z=1.12, extra=taxi_extra, door=[(.80, -.30, ''), (-.36, -.92, 'b')], inside=dict(seat_f=-.32, seat_z=.5, floor=.4, floor_f=-.6, len=2.4, dash_f=.62, dash_z=.92, wheel_f=.36, wheel_z=.92, bench=True, bench_off=.72)),
+    dict(id='bus', label='Double-decker', color=0xc8102e, keys=BUS_KEYS, zones=BUS_ZONES, wheels_f=(3.3, -2.5), arch_z=1.0, wheel_r=.52, track=1.12, hinge=1.25, wheel_w=.36,
+         nose_f=4.62, nose_z=.9, tail_f=-4.62, tail_z=1.0, mirror_f=3.2, mirror_z=2.2, bumper='trim', bump_z=.5, extra=bus_extra, door=[(3.5, 2.5, '')], tl=((.3, .06, .3), 1.0),
+         inside=dict(seat_f=3.0, seat_z=1.0, floor=.55, floor_f=2.5, len=2.4, dash_f=3.9, dash_z=1.35, wheel_f=3.7, wheel_z=1.35)),
+]
+
 CARS = [
     dict(id='saloon', label='Saloon', color=0x7a1c22, keys=SALOON_KEYS, zones=SALOON_ZONES, wheels_f=(1.38, -1.38), arch_z=.8, wheel_r=.38,
          nose_f=2.22, nose_z=.78, tail_f=-2.22, tail_z=.86, mirror_f=.7, mirror_z=1.09, extra=saloon_extra, door=[(.80, -.30, ''), (-.36, -.92, 'b')], inside=dict(seat_f=-.32, seat_z=.5, floor=.4, floor_f=-.6, len=2.4, dash_f=.62, dash_z=.92, wheel_f=.36, wheel_z=.92, bench=True, bench_off=.72)),
@@ -374,6 +437,8 @@ CARS = [
     dict(id='police', label='Police car', color=0xf4f4f4, checks=True, keys=SALOON_KEYS, zones=SALOON_ZONES, wheels_f=(1.38, -1.38), arch_z=.8, wheel_r=.38,
          nose_f=2.22, nose_z=.78, tail_f=-2.22, tail_z=.86, mirror_f=.7, mirror_z=1.09, extra=police_extra, door=[(.80, -.30, ''), (-.36, -.92, 'b')], inside=dict(seat_f=-.32, seat_z=.5, floor=.4, floor_f=-.6, len=2.4, dash_f=.62, dash_z=.92, wheel_f=.36, wheel_z=.92, bench=True, bench_off=.72)),
 ]
+
+CARS += CARS_EXTRA
 
 roots = {}
 for k, cfg in enumerate(CARS):
@@ -400,11 +465,14 @@ bpy.ops.object.empty_add(location=(0, 0, .75)); tgt = bpy.context.object
 bpy.ops.object.camera_add(); cam = bpy.context.object; sc.camera = cam; cam.data.lens = 50
 tc = cam.constraints.new('TRACK_TO'); tc.target = tgt
 views = {'front': (6.2, -8.0, 3.0), 'rear': (-6.0, 7.6, 3.2), 'door': (-7.0, -5.5, 3.2)}
+ONLY = [a[5:] for a in sys.argv if a.startswith('only=')]
 for cfg in CARS:
+    if ONLY and cfg['id'] not in ONLY[0].split(','): continue
     r = roots[cfg['id']]
     for o in [r] + list(r.children): o.hide_render = False
     for vn, pos in views.items():
-        cam.location = pos
+        cam.location = tuple(p * (2.1 if cfg['id'] == 'bus' else 1) for p in pos)
+        tgt.location = (0, 0, 2.0 if cfg['id'] == 'bus' else .75)
         for o in r.children:
             if '_door_r' in o.name: o.rotation_euler.z = -1.15 if vn == 'door' else 0
         sc.render.filepath = f"{OUT}/{cfg['id']}_{vn}.png"
