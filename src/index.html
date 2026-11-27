@@ -357,7 +357,7 @@ let SPRAY=null;
     g.fillStyle='#2a1030';g.fillRect(0,0,512,96);g.fillStyle='#ff7fc0';g.font='bold 64px Impact, Arial Black, sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('SPRAY SHOP',256,52);
     const sign=new THREE.Mesh(new THREE.PlaneGeometry(10,1.9),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc)}));
     sign.rotation.y=Math.atan2(-vx,-vz);sign.position.set(fx-vx*.35,7.2,fz-vz*.35);scene.add(sign);
-    SPRAY={x:gx+vx*.5,z:gz+vz*.5,cd:0};}}
+    SPRAY={x:gx+vx*.5,z:gz+vz*.5,cd:0,ang:Math.atan2(vx,vz)};}}
 // ---- buildings
 for(const L of CITY.lots){if(L.skip)continue;const pal=BCOL[L.kind]||BCOL.shop;addBlockBuilding(L,pal[Math.floor(rnd()*pal.length)]);}
 finishChunks();
@@ -1549,7 +1549,10 @@ function updateHUD(){
 
 // ---------------- world population ----------------
 function populate(){
-  {const E=REDGES.find(e=>e.a==='H1'&&e.b==='C'),L=E.lanes[1],P=lanePt(L,L.len*.45),tl=Math.hypot(P.tx,P.tz),fx=P.tx/tl,fz=P.tz/tl,px=fz,pz=-fx;
+  {const E=REDGES.find(e=>e.a==='H1'&&e.b==='C'),L=E.lanes[1];
+    // a spot on the High Street pavement well clear of every shop door
+    let f=.2;for(;f<.9;f+=.04){const Q=lanePt(L,L.len*f),t=Math.hypot(Q.tx,Q.tz),o=E.kerbOff-E.lane+2.9,x=Q.x+Q.tz/t*o,z=Q.z-Q.tx/t*o;if(SHOPS.every(S=>d2(S.x,S.z,x,z)>8*8))break;}
+    const P=lanePt(L,L.len*f),tl=Math.hypot(P.tx,P.tz),fx=P.tx/tl,fz=P.tz/tl,px=fz,pz=-fx;
     const ko=E.kerbOff-E.lane;makeCar(P.x+px*ko,P.z+pz*ko,Math.atan2(fx,fz),'parked',false);
     const wo=ko+2.9;player.pos.set(P.x+px*wo+fx*2,0,P.z+pz*wo+fz*2);player.facing=Math.atan2(-px,-pz);}
   for(let k=0;k<12;k++)spawnCarOnRoad({parked:true,min:15});
