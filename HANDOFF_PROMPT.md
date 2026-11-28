@@ -172,3 +172,10 @@ Measured with a draw-call tally (see `br/test/perf*.js`). Start-of-game frame on
 - `updateTiles()` (called from `update`) keeps tiles within `floor(fogFar/TILE)+1` of the player in the scene, loads the nearest 6 per frame, and removes tiles beyond R+1 and **disposes their GPU geometry** (re-uploaded automatically when they return). `updateTiles(true)` loads everything instantly (end of `populate`).
 - Colliders (`COLG` grid), the minimap canvas, the road graph and the interiors are still global, built once. Next steps to reach a San Andreas-sized map: (1) generate each tile's geometry from the seed on demand instead of keeping the merged arrays (give every lot its own random seed instead of the global `LR`/`rnd` stream), (2) stream colliders per tile, (3) per-tile ground textures instead of one 2048 px canvas, (4) a larger `buildCity` layout (extra districts, motorways).
 - Measured (phone profile, static scenery only, SwiftShader): triangles per frame 110k -> 25-90k; draw calls 150/122/79/48 -> 128/157/42/31 at four test spots. Reload after unload is pixel-identical. Tests: `br/test/tiles.js`, `tiles_dbg2.js`.
+
+## Tiles built from the seed on demand
+- Each tile (`TILE=192`) keeps only lists: `lots` (building plots, each with `_i`), `props` (matrices of trees/lamps/furniture by kind) and `stat` (permanent objects). Colliders are still made at startup.
+- `tileBuild(t)` makes the tile's geometry (buildings via `buildingMesh`, props via `tileProps`, ground via `tileGround`); every plot calls `LRseed(L._i)` so the result is identical each time. `tileFree(t)` disposes it.
+- `updateTiles` builds adjacent tiles at once, others one per frame, and skips unloading while indoors.
+- Measured: rebuilt tiles are byte-identical, 2-14 ms each, whole city about 40 ms.
+- Next (ask first): stream colliders per tile, per-tile ground textures, bigger `buildCity` layout.

@@ -294,7 +294,7 @@ function colAlongRay(O,D,L){const x1=O.x+D.x*L,z1=O.z+D.z*L;return colNear(Math.
 // ---- British buildings: canvas-drawn fronts per building type, pitched slate roofs and chimneys, merged per material
 function cvTex(w,h,draw,rep){const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');draw(g,w,h);const t=new THREE.CanvasTexture(c);
   if(rep)t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=4;return t;}
-const LR=(()=>{let s=4242;return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646;};})();   // own random, so the city layout never shifts
+let LRs=4242;const LR=()=>{LRs=(LRs*16807)%2147483647;return(LRs-1)/2147483646;};const LRseed=n=>{LRs=((n+7)*2654435761)%2147483646+1;};   // own random, so the city layout never shifts
 function bricks(g,x0,y0,w,h,base,var_){g.fillStyle=base;g.fillRect(x0,y0,w,h);const bh=6,bw=16;
   for(let y=y0,r=0;y<y0+h;y+=bh,r++)for(let x=x0-(r%2)*bw/2;x<x0+w;x+=bw){const k=(LR()-.5)*(var_||26);g.fillStyle=`rgba(${k>0?255:0},${k>0?230:0},${k>0?210:0},${Math.abs(k)/255})`;g.fillRect(x,y,bw-1,bh-1);}
   g.fillStyle='rgba(225,215,200,.35)';for(let y=y0;y<y0+h;y+=bh)g.fillRect(x0,y+bh-1,w,1);}
@@ -342,23 +342,32 @@ const T_WORKSIDE=T_WORKS;
 // per tile; only the tiles near you are in the scene, and far tiles give their graphics memory back until you return.
 const TILE=192,TILES=new Map();
 const tileKeyAt=(x,z)=>Math.floor(x/TILE)+','+Math.floor(z/TILE);
-function tileGet(key){let t=TILES.get(key);if(!t){const q=key.split(',');t={key,tx:+q[0],tz:+q[1],group:new THREE.Group(),on:false,meshes:[]};TILES.set(key,t);}return t;}
-function tileAddMesh(key,mesh){const t=tileGet(key);t.group.add(mesh);t.meshes.push(mesh);}
-function worldAdd(obj){tileAddMesh(tileKeyAt(obj.position.x,obj.position.z),obj);return obj;}
+// A tile owns: its building plots (`lots`), the filed-away positions of its trees/lamps/furniture (`props`), a few permanent odds and ends (`stat`).
+// Its geometry is NOT kept: `tileBuild` makes it from those lists when you get near (deterministically: every plot reseeds its own random numbers),
+// and `tileFree` throws it away again when you leave, so memory depends on the view distance, not on the size of the map.
+function tileGet(key){let t=TILES.get(key);if(!t){const q=key.split(',');t={key,tx:+q[0],tz:+q[1],group:new THREE.Group(),on:false,built:false,meshes:[],stat:[],lots:[],props:{}};TILES.set(key,t);}return t;}
+function worldAdd(obj){const t=tileGet(tileKeyAt(obj.position.x,obj.position.z));t.group.add(obj);t.stat.push(obj);return obj;}
+let CB=null;const BM_MATS={};
+function bmat(key,tex){return CB[key]||(CB[key]={m:BM_MATS[key]||(BM_MATS[key]=new THREE.MeshLambertMaterial({map:tex,vertexColors:true})),G:{p:[],n:[],u:[],c:[]}});}
+const ROOFM=new THREE.MeshLambertMaterial({vertexColors:true});
+function roofOf(){return CB.__roof||(CB.__roof={m:ROOFM,G:{p:[],n:[],u:[],c:[]}});}
 let tlx=1e9,tlz=1e9,tlR=-1,tlPending=false;
-function updateTiles(all){const f=focus(),tx=Math.floor(f.x/TILE),tz=Math.floor(f.z/TILE),R=Math.floor(scene.fog.far/TILE)+1;
+const TSTAT={built:0,freed:0,ms:0};
+function tileBuild(t){const t0=performance.now();CB={};
+  for(const L of t.lots){LRseed(L._i);buildingMesh(L);}
+  finishChunks(t);CB=null;tileProps(t);tileGround(t);t.built=true;TSTAT.built++;TSTAT.ms=performance.now()-t0;}
+function tileFree(t){scene.remove(t.group);t.on=false;
+  for(const m of t.meshes){t.group.remove(m);m.geometry.dispose();}t.meshes.length=0;t.built=false;TSTAT.freed++;}
+function updateTiles(all){if(INSIDE&&!all)return;const f=focus(),tx=Math.floor(f.x/TILE),tz=Math.floor(f.z/TILE),R=Math.floor(scene.fog.far/TILE)+1;
   if(!all&&!tlPending&&tx===tlx&&tz===tlz&&R===tlR)return;tlx=tx;tlz=tz;tlR=R;
   const want=[];
   for(const t of TILES.values()){const d=Math.max(Math.abs(t.tx-tx),Math.abs(t.tz-tz));
-    if(d<=R){if(!t.on)want.push([Math.hypot(t.tx-tx,t.tz-tz),t]);}
-    else if(t.on&&d>R+1){scene.remove(t.group);t.on=false;for(const m of t.meshes)m.geometry.dispose();}}
-  want.sort((a,b)=>a[0]-b[0]);const n=all?want.length:6;
-  for(let i=0;i<want.length&&i<n;i++){scene.add(want[i][1].group);want[i][1].on=true;}
-  tlPending=want.length>n;}
-const BMAT={},BM_MATS={};let curTile='0,0';
-function bmat(key,tex){const k=curTile+'|'+key;return BMAT[k]||(BMAT[k]={tile:curTile,m:BM_MATS[key]||(BM_MATS[key]=new THREE.MeshLambertMaterial({map:tex,vertexColors:true})),G:{p:[],n:[],u:[],c:[]}});}
-const ROOFM=new THREE.MeshLambertMaterial({vertexColors:true}),ROOFS={};
-function roofOf(){return ROOFS[curTile]||(ROOFS[curTile]={tile:curTile,m:ROOFM,G:{p:[],n:[],u:[],c:[]}});}
+    if(d<=R){if(!t.on)want.push([Math.hypot(t.tx-tx,t.tz-tz),d,t]);}
+    else if(t.on&&d>R+1)tileFree(t);}
+  want.sort((a,b)=>a[0]-b[0]);let done=0;
+  for(const w of want){const t=w[2];if(!(all||w[1]<=1||done<1)){continue;}   // tiles right next to you are built at once, the rest one per frame
+    if(!t.built)tileBuild(t);scene.add(t.group);t.on=true;done++;}
+  tlPending=done<want.length;}
 const _v1=new THREE.Vector3(),_v2=new THREE.Vector3(),_col=new THREE.Color();
 // a triangle facing away from (cx,cy,cz)
 function tri(G,a,b,c,col,uva,uvb,uvc,ctr){_v1.set(b[0]-a[0],b[1]-a[1],b[2]-a[2]);_v2.set(c[0]-a[0],c[1]-a[1],c[2]-a[2]);_v1.cross(_v2);
@@ -372,8 +381,8 @@ function boxInto(G,cx,cy,cz,w,h,d,ang,col){const B=CH.obb(cx,cz,w,d,ang),y0=cy-h
 const tint=(lo)=>{const k=lo+LR()*(1-lo);_col.setRGB(k,k,k);return _col.getHex();};
 const SLATE=[0x4c5158,0x555a61,0x5d6168,0x474b52];
 let PUB_LOT=null;
-function addBlockBuilding(L){
-  curTile=tileKeyAt(L.cx,L.cz);
+function addBuildingCol(L){addColBox(L.cx,L.cz,L.w,L.d,L.ang,L.h);}
+function buildingMesh(L){
   const B=L.box,h=L.h,ctr=[L.cx,h/2,L.cz],kind=L.kind;
   let front,side,fu=1,fv=1,su=4,sv=3.6;
   if(kind==='terrace'){const k=Math.floor(LR()*4);front=bmat('terr'+k,T_TERR[k]);side=bmat('brickw',T_BRICKW);fv=h/7.6;}
@@ -402,11 +411,11 @@ function addBlockBuilding(L){
     if(kind==='shop'){// a parapet along the front
       const a=L.ang,vx=Math.sin(a),vz=Math.cos(a);boxInto(R,L.cx-vx*(L.d/2-.15),h+.35,L.cz-vz*(L.d/2-.15),L.w,.7,.3,a,0xddd5c4);}
     if(h>20){const ins=.32;boxInto(R,L.cx,h+.8,L.cz,L.w*ins,1.6,L.d*ins,L.ang,0x5b5752);}}
-  addColBox(L.cx,L.cz,L.w,L.d,L.ang,h);}
-function finishChunks(){for(const M of [...Object.values(BMAT),...Object.values(ROOFS)]){const G=M.G;if(!G.p.length)continue;
+}
+function finishChunks(t){for(const M of Object.values(CB)){const G=M.G;if(!G.p.length)continue;
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(G.p,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(G.n,3));
   g.setAttribute('uv',new THREE.Float32BufferAttribute(G.u,2));g.setAttribute('color',new THREE.Float32BufferAttribute(G.c,3));g.computeBoundingSphere();
-  const mesh=new THREE.Mesh(g,M.m);mesh.castShadow=true;mesh.receiveShadow=true;tileAddMesh(M.tile,mesh);}}
+  const mesh=new THREE.Mesh(g,M.m);mesh.castShadow=true;mesh.receiveShadow=true;t.group.add(mesh);t.meshes.push(mesh);}}
 // the pub: the High Street plot nearest the Market Cross
 {const S=CITY.lots.filter(l=>l.kind==='shop').sort((a,b)=>Math.hypot(a.cx,a.cz-2)-Math.hypot(b.cx,b.cz-2));PUB_LOT=S[0]||null;if(PUB_LOT)PUB_LOT.taken=true;}
 
@@ -475,8 +484,8 @@ let HOMELOT=null,HOMEPT=null,HOMEDOFF=0,LOCKLOT=null,LOCKPT=null;
 const onLockPlot=(x,z,m)=>{if(!LOCKLOT)return false;const L=LOCKLOT,vx=Math.sin(L.ang),vz=Math.cos(L.ang),ux=Math.cos(L.ang),uz=-Math.sin(L.ang),dx=x-L.cx,dz=z-L.cz;
   return Math.abs(dx*ux+dz*uz)<L.w/2+m&&Math.abs(dx*vx+dz*vz)<L.d/2+m;};
 // ---- buildings
-for(const L of CITY.lots){if(L.skip)continue;addBlockBuilding(L);}
-finishChunks();
+CITY.lots.forEach((L,i)=>{L._i=i;});
+for(const L of CITY.lots){if(L.skip)continue;addBuildingCol(L);tileGet(tileKeyAt(L.cx,L.cz)).lots.push(L);}
 
 // ---- street lamps and trees (instanced)
 const palmT=[],palmL=[],lampP=[],lampH=[];
@@ -506,17 +515,23 @@ const WALLM=[],WALLMAT=lam(0x9c9488);
   const a=Math.atan2(-dz,dx);addColBox((p[0]+q[0])/2,(p[1]+q[1])/2,L+.6,1,a,2.2);dummy.position.set((p[0]+q[0])/2,1.1,(p[1]+q[1])/2);dummy.rotation.set(0,a,0);dummy.scale.set(L+.6,2.2,1);dummy.updateMatrix();WALLM.push(dummy.matrix.clone());}}
 
 // props (trees, lamps, street furniture) are baked into one merged mesh per tile: a couple of draw calls per tile, not one per kind
-const PROPG={};
+const PKIND=[],PMAT={lit:new THREE.MeshLambertMaterial({vertexColors:true}),glow:new THREE.MeshBasicMaterial({vertexColors:true})};
+// startup: only file each instance's matrix under its tile
 function bakeProps(geo,mat,list,getM){
-  if(!list.length)return;const src=geo.index?geo.toNonIndexed():geo.clone(),glow=!!mat.isMeshBasicMaterial,P=src.attributes.position.array,N=src.attributes.normal.array,C=src.attributes.color?src.attributes.color.array:null,vn=P.length/3;
-  const col=new THREE.Color();if(!C)col.copy(mat.color);const nm=new THREE.Matrix3(),v=new THREE.Vector3(),n=new THREE.Vector3();
-  for(const item of list){const m=getM(item),key=tileKeyAt(m.elements[12],m.elements[14]);const T=PROPG[key]||(PROPG[key]={lit:{p:[],n:[],c:[]},glow:{p:[],n:[],c:[]}}),A=glow?T.glow:T.lit;nm.getNormalMatrix(m);
-    for(let q=0;q<vn;q++){v.set(P[q*3],P[q*3+1],P[q*3+2]).applyMatrix4(m);A.p.push(v.x,v.y,v.z);n.set(N[q*3],N[q*3+1],N[q*3+2]).applyMatrix3(nm).normalize();A.n.push(n.x,n.y,n.z);
-      if(C)A.c.push(C[q*3],C[q*3+1],C[q*3+2]);else A.c.push(col.r,col.g,col.b);}}}
-function finishProps(){const mats={lit:new THREE.MeshLambertMaterial({vertexColors:true}),glow:new THREE.MeshBasicMaterial({vertexColors:true})};
-  for(const key in PROPG)for(const kind of['lit','glow']){const A=PROPG[key][kind];if(!A.p.length)continue;
-    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(A.p,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(A.n,3));g.setAttribute('color',new THREE.Float32BufferAttribute(A.c,3));g.computeBoundingSphere();
-    const m=new THREE.Mesh(g,mats[kind]);m.castShadow=kind==='lit';m.receiveShadow=kind==='lit';tileAddMesh(key,m);}}
+  if(!list.length)return;const kind={geo,src:null,glow:!!mat.isMeshBasicMaterial,color:mat.color?mat.color.clone():new THREE.Color(1,1,1)};PKIND.push(kind);const ki=PKIND.length-1;
+  for(const item of list){const m=getM(item),t=tileGet(tileKeyAt(m.elements[12],m.elements[14]));(t.props[ki]||(t.props[ki]=[])).push(m.elements.slice());}}
+// when a tile is built: bake its props into at most two merged meshes
+const _pm=new THREE.Matrix4(),_pn=new THREE.Matrix3(),_pv=new THREE.Vector3(),_pnv=new THREE.Vector3();
+function tileProps(t){const A={lit:{p:[],n:[],c:[]},glow:{p:[],n:[],c:[]}};let any=false;
+  for(const ki in t.props){const kind=PKIND[ki];if(!kind.src)kind.src=kind.geo.index?kind.geo.toNonIndexed():kind.geo.clone();
+    const P=kind.src.attributes.position.array,N=kind.src.attributes.normal.array,C=kind.src.attributes.color?kind.src.attributes.color.array:null,vn=P.length/3,B=kind.glow?A.glow:A.lit,col=kind.color;
+    for(const e of t.props[ki]){_pm.fromArray(e);_pn.getNormalMatrix(_pm);any=true;
+      for(let q=0;q<vn;q++){_pv.set(P[q*3],P[q*3+1],P[q*3+2]).applyMatrix4(_pm);B.p.push(_pv.x,_pv.y,_pv.z);_pnv.set(N[q*3],N[q*3+1],N[q*3+2]).applyMatrix3(_pn).normalize();B.n.push(_pnv.x,_pnv.y,_pnv.z);
+        if(C)B.c.push(C[q*3],C[q*3+1],C[q*3+2]);else B.c.push(col.r,col.g,col.b);}}}
+  if(!any)return;
+  for(const kind of['lit','glow']){const Q=A[kind];if(!Q.p.length)continue;
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(Q.p,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(Q.n,3));g.setAttribute('color',new THREE.Float32BufferAttribute(Q.c,3));g.computeBoundingSphere();
+    const m=new THREE.Mesh(g,PMAT[kind]);m.castShadow=kind==='lit';m.receiveShadow=kind==='lit';t.group.add(m);t.meshes.push(m);}}
 function inst(geo,mat,list){bakeProps(geo,mat,list,m=>m);}
 bakeProps(boxG,WALLMAT,WALLM,m=>m);
 inst(new THREE.CylinderGeometry(.16,.26,7,6),lam(0x6b5440),palmT);
@@ -565,7 +580,6 @@ if(PUB_LOT){const L=PUB_LOT,a=L.ang,vx=Math.sin(a),vz=Math.cos(a),ux=Math.cos(a)
     g.beginPath();g.arc(64,58,26,0,7);g.fill();g.fillStyle='#c9a648';g.font='bold 18px Georgia, serif';g.textAlign='center';g.fillText('RED LION',64,108);});
   const sg=new THREE.Mesh(new THREE.BoxGeometry(.06,.9,.9),[new THREE.MeshLambertMaterial({map:t}),new THREE.MeshLambertMaterial({map:t}),lam(0x123d2a),lam(0x123d2a),lam(0x123d2a),lam(0x123d2a)]);
   sg.position.set(fx-vx*1.05,4.05,fz-vz*1.05);sg.rotation.y=a;worldAdd(sg);}
-finishProps();
 // ground detail: double yellow lines near junctions, garden walls behind the terraces
 {const near=(x,z)=>{for(const k in CITY.nodes){const n=CITY.nodes[k];if(!n.rb&&n.edges.length<3)continue;if(Math.hypot(n.x-x,n.z-z)<(n.rb?n.rb+24:19))return true;}return false;};
   mg.strokeStyle='#e5bf2e';mg.lineWidth=Math.max(1,.11*K);mg.lineCap='butt';
@@ -580,13 +594,14 @@ finishProps();
     for(const c of[B[3],B[2]]){const ex=c[0]+vx*gd,ez=c[1]+vz*gd;if(!CH.inside(b.line,ex,ez))continue;mg.beginPath();mg.moveTo(mc(c[0]),mc(c[1]));mg.lineTo(mc(ex),mc(ez));mg.stroke();}
     const e0=[B[3][0]+vx*gd,B[3][1]+vz*gd],e1=[B[2][0]+vx*gd,B[2][1]+vz*gd];if(CH.inside(b.line,e0[0],e0[1])&&CH.inside(b.line,e1[0],e1[1])){mg.beginPath();mg.moveTo(mc(e0[0]),mc(e0[1]));mg.lineTo(mc(e1[0]),mc(e1[1]));mg.stroke();}}}
 const groundTex=new THREE.CanvasTexture(mapC);groundTex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
-{const gm=new THREE.MeshLambertMaterial({map:groundTex});
-  for(let tx=Math.floor(WMIN/TILE);tx<=Math.floor(WMAX/TILE);tx++)for(let tz=Math.floor(WMIN/TILE);tz<=Math.floor(WMAX/TILE);tz++){
-    const x0=Math.max(tx*TILE,WMIN),x1=Math.min((tx+1)*TILE,WMAX),z0=Math.max(tz*TILE,WMIN),z1=Math.min((tz+1)*TILE,WMAX);if(x1<=x0||z1<=z0)continue;
-    const u=x=>(x-WMIN)/WSIZE,v=z=>1-(z-WMIN)/WSIZE,g=new THREE.BufferGeometry();
-    g.setAttribute('position',new THREE.Float32BufferAttribute([x0,0,z0,x0,0,z1,x1,0,z1,x1,0,z0],3));g.setAttribute('normal',new THREE.Float32BufferAttribute([0,1,0,0,1,0,0,1,0,0,1,0],3));
-    g.setAttribute('uv',new THREE.Float32BufferAttribute([u(x0),v(z0),u(x0),v(z1),u(x1),v(z1),u(x1),v(z0)],2));g.setIndex([0,1,2,0,2,3]);g.computeBoundingSphere();
-    const m=new THREE.Mesh(g,gm);m.receiveShadow=true;tileAddMesh(tx+','+tz,m);}}
+const GROUNDMAT=new THREE.MeshLambertMaterial({map:groundTex});
+function tileGround(t){const x0=Math.max(t.tx*TILE,WMIN),x1=Math.min((t.tx+1)*TILE,WMAX),z0=Math.max(t.tz*TILE,WMIN),z1=Math.min((t.tz+1)*TILE,WMAX);if(x1<=x0||z1<=z0)return;
+  const u=x=>(x-WMIN)/WSIZE,v=z=>1-(z-WMIN)/WSIZE,g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute([x0,0,z0,x0,0,z1,x1,0,z1,x1,0,z0],3));g.setAttribute('normal',new THREE.Float32BufferAttribute([0,1,0,0,1,0,0,1,0,0,1,0],3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute([u(x0),v(z0),u(x0),v(z1),u(x1),v(z1),u(x1),v(z0)],2));g.setIndex([0,1,2,0,2,3]);g.computeBoundingSphere();
+  const m=new THREE.Mesh(g,GROUNDMAT);m.receiveShadow=true;t.group.add(m);t.meshes.push(m);}
+// make sure every tile that overlaps the map exists, even if it holds no buildings
+for(let tx=Math.floor(WMIN/TILE);tx<=Math.floor(WMAX/TILE);tx++)for(let tz=Math.floor(WMIN/TILE);tz<=Math.floor(WMAX/TILE);tz++)tileGet(tx+','+tz);
 const outer=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),new THREE.MeshLambertMaterial({color:0x7b8458}));
 outer.rotation.x=-Math.PI/2;outer.position.y=-0.03;scene.add(outer);
 
