@@ -277,9 +277,9 @@ const mc=v=>(v-WMIN)*K;
 // ---- colliders: rotated boxes (and plain axis-aligned ones), with a grid for fast lookups
 const colliders=[],COLG=new Map(),COLC=16;let colStamp=0;
 function addColBox(cx,cz,w,d,ang,h,small){const c=Math.cos(ang),s=Math.sin(ang),hw=w/2,hd=d/2,ex=Math.abs(c)*hw+Math.abs(s)*hd,ez=Math.abs(s)*hw+Math.abs(c)*hd;
-  const o={cx,cz,hw,hd,c,s,x0:cx-ex,x1:cx+ex,z0:cz-ez,z1:cz+ez,h,small:!!small,st:0};colliders.push(o);
-  for(let i=Math.floor(o.x0/COLC);i<=Math.floor(o.x1/COLC);i++)for(let j=Math.floor(o.z0/COLC);j<=Math.floor(o.z1/COLC);j++){const k=i*4096+j;let L=COLG.get(k);if(!L)COLG.set(k,L=[]);L.push(o);}
-  return o;}
+  const o={cx,cz,hw,hd,c,s,x0:cx-ex,x1:cx+ex,z0:cz-ez,z1:cz+ez,h,small:!!small,st:0};colliders.push(o);colGrid(o,1);return o;}
+function colGrid(o,add){for(let i=Math.floor(o.x0/COLC);i<=Math.floor(o.x1/COLC);i++)for(let j=Math.floor(o.z0/COLC);j<=Math.floor(o.z1/COLC);j++){const k=i*4096+j;let L=COLG.get(k);
+  if(add){if(!L)COLG.set(k,L=[]);L.push(o);}else if(L){const q=L.indexOf(o);if(q>=0)L.splice(q,1);if(!L.length)COLG.delete(k);}}}
 function addCol(x0,x1,z0,z1,h,small){return addColBox((x0+x1)/2,(z0+z1)/2,x1-x0,z1-z0,0,h,small);}
 const _cq=[];
 function colNear(x0,x1,z0,z1){_cq.length=0;colStamp++;
@@ -345,7 +345,7 @@ const tileKeyAt=(x,z)=>Math.floor(x/TILE)+','+Math.floor(z/TILE);
 // A tile owns: its building plots (`lots`), the filed-away positions of its trees/lamps/furniture (`props`), a few permanent odds and ends (`stat`).
 // Its geometry is NOT kept: `tileBuild` makes it from those lists when you get near (deterministically: every plot reseeds its own random numbers),
 // and `tileFree` throws it away again when you leave, so memory depends on the view distance, not on the size of the map.
-function tileGet(key){let t=TILES.get(key);if(!t){const q=key.split(',');t={key,tx:+q[0],tz:+q[1],group:new THREE.Group(),on:false,built:false,meshes:[],stat:[],lots:[],props:{}};TILES.set(key,t);}return t;}
+function tileGet(key){let t=TILES.get(key);if(!t){const q=key.split(',');t={key,tx:+q[0],tz:+q[1],group:new THREE.Group(),on:false,built:false,meshes:[],stat:[],lots:[],cols:[],props:{}};TILES.set(key,t);}return t;}
 function worldAdd(obj){const t=tileGet(tileKeyAt(obj.position.x,obj.position.z));t.group.add(obj);t.stat.push(obj);return obj;}
 let CB=null;const BM_MATS={};
 function bmat(key,tex){return CB[key]||(CB[key]={m:BM_MATS[key]||(BM_MATS[key]=new THREE.MeshLambertMaterial({map:tex,vertexColors:true})),G:{p:[],n:[],u:[],c:[]}});}
@@ -356,7 +356,7 @@ const TSTAT={built:0,freed:0,ms:0};
 function tileBuild(t){const t0=performance.now();CB={};
   for(const L of t.lots){LRseed(L._i);buildingMesh(L);}
   finishChunks(t);CB=null;tileProps(t);tileGround(t);t.built=true;TSTAT.built++;TSTAT.ms=performance.now()-t0;}
-function tileFree(t){scene.remove(t.group);t.on=false;
+function tileFree(t){scene.remove(t.group);t.on=false;for(const o of t.cols)colGrid(o,0);
   for(const m of t.meshes){t.group.remove(m);m.geometry.dispose();}t.meshes.length=0;t.built=false;TSTAT.freed++;}
 function updateTiles(all){if(INSIDE&&!all)return;const f=focus(),tx=Math.floor(f.x/TILE),tz=Math.floor(f.z/TILE),R=Math.floor(scene.fog.far/TILE)+1;
   if(!all&&!tlPending&&tx===tlx&&tz===tlz&&R===tlR)return;tlx=tx;tlz=tz;tlR=R;
@@ -366,7 +366,7 @@ function updateTiles(all){if(INSIDE&&!all)return;const f=focus(),tx=Math.floor(f
     else if(t.on&&d>R+1)tileFree(t);}
   want.sort((a,b)=>a[0]-b[0]);let done=0;
   for(const w of want){const t=w[2];if(!(all||w[1]<=1||done<1)){continue;}   // tiles right next to you are built at once, the rest one per frame
-    if(!t.built)tileBuild(t);scene.add(t.group);t.on=true;done++;}
+    if(!t.built)tileBuild(t);scene.add(t.group);for(const o of t.cols){colGrid(o,0);colGrid(o,1);}t.on=true;done++;}
   tlPending=done<want.length;}
 const _v1=new THREE.Vector3(),_v2=new THREE.Vector3(),_col=new THREE.Color();
 // a triangle facing away from (cx,cy,cz)
@@ -381,7 +381,7 @@ function boxInto(G,cx,cy,cz,w,h,d,ang,col){const B=CH.obb(cx,cz,w,d,ang),y0=cy-h
 const tint=(lo)=>{const k=lo+LR()*(1-lo);_col.setRGB(k,k,k);return _col.getHex();};
 const SLATE=[0x4c5158,0x555a61,0x5d6168,0x474b52];
 let PUB_LOT=null;
-function addBuildingCol(L){addColBox(L.cx,L.cz,L.w,L.d,L.ang,L.h);}
+function addBuildingCol(L,t){t.cols.push(addColBox(L.cx,L.cz,L.w,L.d,L.ang,L.h));}
 function buildingMesh(L){
   const B=L.box,h=L.h,ctr=[L.cx,h/2,L.cz],kind=L.kind;
   let front,side,fu=1,fv=1,su=4,sv=3.6;
@@ -485,7 +485,7 @@ const onLockPlot=(x,z,m)=>{if(!LOCKLOT)return false;const L=LOCKLOT,vx=Math.sin(
   return Math.abs(dx*ux+dz*uz)<L.w/2+m&&Math.abs(dx*vx+dz*vz)<L.d/2+m;};
 // ---- buildings
 CITY.lots.forEach((L,i)=>{L._i=i;});
-for(const L of CITY.lots){if(L.skip)continue;addBuildingCol(L);tileGet(tileKeyAt(L.cx,L.cz)).lots.push(L);}
+for(const L of CITY.lots){if(L.skip)continue;{const t=tileGet(tileKeyAt(L.cx,L.cz));addBuildingCol(L,t);t.lots.push(L);}}
 
 // ---- street lamps and trees (instanced)
 const palmT=[],palmL=[],lampP=[],lampH=[];

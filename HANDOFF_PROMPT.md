@@ -179,3 +179,4 @@ Measured with a draw-call tally (see `br/test/perf*.js`). Start-of-game frame on
 - `updateTiles` builds adjacent tiles at once, others one per frame, and skips unloading while indoors.
 - Measured: rebuilt tiles are byte-identical, 2-14 ms each, whole city about 40 ms.
 - Next (ask first): stream colliders per tile, per-tile ground textures, bigger `buildCity` layout.
+- Colliders: each tile's building colliders (`t.cols`) leave the collision grid in `tileFree` and return when the tile loads (`colGrid(o,add)`). Props/fences/phone boxes still stay permanent. Verified: free removes, reload restores (2952 grid entries both times). Remaining: per-tile ground textures, bigger city layout.
